@@ -16,6 +16,7 @@ processed/
 node_modules/
 frontend/dist/
 frontend/.vite/
+*.tsbuildinfo
 .vscode/
 .idea/
 Thumbs.db

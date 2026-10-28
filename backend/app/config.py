@@ -1,4 +1,5 @@
 from functools import lru_cache
+from decimal import Decimal
 from pathlib import Path
 
 from pydantic import Field
@@ -31,6 +32,16 @@ class Settings(BaseSettings):
     ollama_enabled: bool = False
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = ""
+    ollama_timeout_seconds: int = Field(default=20, gt=0, le=120)
+    invoice_rounding_tolerance: Decimal = Field(default=Decimal("0.02"), ge=0)
+    allow_negative_invoice_amounts: bool = False
+    worker_poll_interval_seconds: float = Field(default=2.0, gt=0, le=60)
+    worker_lease_seconds: int = Field(default=900, gt=0)
+    worker_stale_seconds: int = Field(default=60, gt=0)
+    worker_max_attempts: int = Field(default=3, gt=0, le=10)
+    embedding_model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
+    semantic_max_documents: int = Field(default=5000, gt=0, le=50000)
+    search_index_max_chars: int = Field(default=1_000_000, gt=1000)
 
     model_config = SettingsConfigDict(env_file=BACKEND_DIR.parent / ".env", env_file_encoding="utf-8", extra="ignore")
 

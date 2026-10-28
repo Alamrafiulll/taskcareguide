@@ -1,21 +1,52 @@
 # Architecture
 
-The system is local-first: a React/Vite client calls FastAPI on localhost. FastAPI receives multipart uploads and hands each file to a format-specific processor selected by extension after checking its size and content signature. The supported processors are PyMuPDF PDF, Pillow/Tesseract image, pandas Excel, and Python CSV.
+## Runtime components
+
+The local application has three independent processes: a React/Vite frontend, a FastAPI API process, and a persistent SQLite-backed worker. The API stores upload bytes and creates a document plus queued job in one request; it does not wait for OCR or extraction. The worker claims work transactionally, runs the existing format-specific processors, extracts invoice data, applies validation, and persists results. The worker commits progress and lease heartbeats so a restart does not silently discard queued work.
 
 ```text
-React/Vite -> FastAPI /documents/ingest -> safe staging + hash/signature validation
-                                           |-> PDF pages -> PyMuPDF text -> OCR only sparse pages
-                                           |-> images -> Pillow preprocessing -> Tesseract OCR
-                                           |-> XLS/XLSX/CSV -> sheet/row and cell-aware extraction
-                                           +-> SQLite status/history/result via SQLAlchemy
-                                           +-> uploads/ (original bytes)
-                                           +-> processed/ (normalized JSON and text)
+React/Vite -> FastAPI -> SQLite (documents, jobs, audit/history, results)
+                         |                           ^
+                         +-> uploads/ (original)      |
+                         +-> processed/ (JSON/text)   |
+                                                     |
+                                   SQLite worker <---+
+                                     |-> PyMuPDF page processing / OCR with Pillow + local Tesseract
+                                     |-> pandas/openpyxl/xlrd/CSV parsers
+                                     |-> deterministic invoice extraction, optional local Ollama
+                                     +-> optional local sentence-transformers vectors for search
 ```
 
-Each batch item is isolated. Files are copied to generated UUID-based names in bounded chunks; submitted names are retained only as display metadata. Hashes are stored for duplicate detection. Originals remain separate from derived text and JSON. Extraction output records source ID/name, format, status, page and sheet counts, segments, table cells, OCR use/confidence, warnings/errors, timestamps and hash.
+## Upload and processing
 
-PDF processing is page-by-page and renders only a sparse-text page to an in-memory image before releasing it. A configured page cap, upload cap, row caps, whole-document deadline and per-OCR call timeout bound resource use. Periodic progress events are persisted in `processing_history`. Tesseract is optional for app startup; scanned pages produce page-scoped errors if it is unavailable. No network or LLM call is part of processing.
+`POST /api/documents/upload` accepts multiple files. Each upload is copied in bounded chunks to a generated UUID-based name; the original submitted name is display metadata only. File size, extension, and practical content signatures are validated before a `documents` row, a `processing_jobs` row, and upload history are committed. The batch isolates each file: invalid items have per-file errors while valid items are queued. SHA-256 supports exact-byte duplicate identification.
 
-SQLAlchemy transactions commit state transitions and roll back failures. The existing `documents`, `processing_jobs`, `invoice_results`, and `processing_history` tables store ingestion status/results. Spreadsheet data remains in the normalized `invoice_results.raw_extraction` JSON rather than introducing parallel document tables. Monetary database columns continue to use `Decimal`/`NUMERIC`.
+Jobs transition through `queued -> running -> completed|failed`. Claim uses a conditional database update so concurrent worker processes cannot claim the same queued row. A lease expiry allows a later worker to recover abandoned work. Transient errors use bounded attempts and backoff; permanent file validation failures are not retried. An operator can explicitly requeue a failed nonpermanent job through the retry endpoint, subject to the configured retry limit. State, errors, progress and retries are persisted in SQLite. A queued job survives API or worker restart because it is not in-memory task state.
 
-The synchronous ingestion endpoint currently returns only after the batch finishes. The next stage is a review workflow and later, if required, a persistent background worker for long-running batches.
+The worker processes a single job at a time per process. SQLite uses WAL, a busy timeout, and short committed state transitions. These choices are suitable for a local assessment, not thousands of concurrent documents. Higher throughput needs a server database, external durable queue, scalable object storage and separately scaled workers.
+
+## Processors and output
+
+The shared processing service dispatches PDF, image, Excel, and CSV implementations. PyMuPDF handles digital text extraction by page and renders only pages that need OCR. Pillow preprocessing and local Tesseract handle scanned PDF pages and images. Pandas plus openpyxl/xlrd extract each worksheet with source coordinates; CSV parsing tolerates encoding and row-shape variations while reporting warnings. Resource caps and timeouts are configured through environment settings.
+
+Every completed processing job writes a normalized result JSON and text file outside the original upload directory. It records source document ID/name, format/status, page or worksheet context, segments/table information, OCR use, warnings/errors, timestamps and processing metadata. Invoice extraction then adds invoice fields, line items, source evidence, method/status/confidence metadata, and structured financial findings. Financial values persist as SQL `NUMERIC`/`Decimal`. An extraction failure is stored on the file/job/history and does not stop sibling upload items.
+
+## REST and review
+
+The `/api/documents` routes provide upload, paginated/filterable list, metadata/status, invoice data, generated JSON download, processing history, validation findings, manual corrections, failed job retry, and two-document comparison. `/api/search` exposes keyword, semantic and hybrid modes. Manual corrections append previous/corrected values, reason, reviewer and timestamp; they update the current result but retain the original extraction JSON and trigger validation again.
+
+Comparison loads stored invoice fields and line items for the selected IDs. It recommends review and does not claim a match if invoice identity evidence is insufficient. Search returns document metadata and scores only; internal indexed source text and filesystem paths are not returned.
+
+## Search
+
+Keyword search uses a private truncated text index plus invoice metadata filters. Semantic search is implemented using local sentence-transformers embeddings (all-MiniLM-L6-v2 by default) and cosine similarity. Model weights load lazily and use CPU by default. Each document vector is persisted with a model identifier and source-text hash, then regenerated when text changes. Semantic search returns `503` if the optional package/weights are unavailable; keyword search remains usable. Hybrid mode ranks by semantic similarity and adds a bounded bonus for keyword matches. The API caps the candidate corpus and result pagination.
+
+## Errors and readiness
+
+HTTP validation and application errors use a JSON `error` object with a stable code and safe message. Unhandled exceptions are logged with stack details server-side and return a generic message. Processing failures are saved to `processing_jobs`, `documents`, and `processing_history`, with permanent file-validation failures distinguished from transient errors. Readiness reports database availability, most recent worker heartbeat, OCR executable availability, and optional local AI availability; optional dependency absence degrades readiness rather than preventing startup.
+
+## Invoice extraction and privacy
+
+The existing deterministic extraction and financial validation modules remain the source of invoice behavior. Ollama is optional and only contacted through the configured local address when enabled; structured output is parsed and validated with Pydantic and bounded retries. Runtime prompts are in [ai-prompts.md](ai-prompts.md). AI-assisted development means a human uses an AI coding tool to write code; runtime AI is the application's optional local model at execution time. These are separate activities.
+
+Original bytes remain under `uploads/`; processed text/JSON and search indexes are separate. The API does not expose unrestricted raw contents, credentials, or stored paths. `.env`, local database files, uploads, model weights, and generated outputs are ignored by Git.

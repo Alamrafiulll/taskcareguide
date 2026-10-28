@@ -1,0 +1,22 @@
+{
+  "valid": {
+    "invoice_number": "CG-1001",
+    "invoice_date": "2025-04-12",
+    "supplier_name": "Northwind Medical",
+    "customer_name": "Care Guide Clinic",
+    "subtotal": "200.00",
+    "tax_amount": "20.00",
+    "total_amount": "220.00",
+    "currency": "USD",
+    "line_items": [
+      {"description": "Consultation", "quantity": "2", "unit_price": "100.00", "line_total": "200.00"}
+    ]
+  },
+  "missing_invoice_number": {"invoice_number": null},
+  "missing_tax": {"tax_amount": null},
+  "incorrect_total": {"expected_total": "221.00", "reconciliation_error": "subtotal_tax_total_mismatch"},
+  "line_sum_mismatch": {"expected_subtotal": "200.00", "observed_line_sum": "180.00", "error": "line_items_subtotal_mismatch"},
+  "unreadable_invoice_number": {"invoice_number": null, "status": "uncertain"},
+  "duplicate": {"same_supplier": true, "same_normalized_invoice_number": true},
+  "comparison": {"same_invoice_number": "CG-1001", "mismatched_total": "221.00"}
+}

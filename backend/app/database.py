@@ -1,7 +1,7 @@
 from collections.abc import Generator
 from pathlib import Path
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.engine import Engine, make_url
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -25,7 +25,9 @@ def build_engine(database_url: str) -> Engine:
         def set_sqlite_pragmas(dbapi_connection, _connection_record):
             cursor = dbapi_connection.cursor()
             cursor.execute("PRAGMA foreign_keys=ON")
-            cursor.execute("PRAGMA busy_timeout=5000")
+            cursor.execute("PRAGMA busy_timeout=10000")
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=NORMAL")
             cursor.close()
     return engine
 
@@ -35,8 +37,38 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False
 
 
 def init_db() -> None:
-    from app.models import document, history, invoice, processing  # noqa: F401
+    from app.models import document, embedding, history, invoice, processing, search, worker  # noqa: F401
     Base.metadata.create_all(bind=engine)
+    # Additive SQLite upgrades for databases created by earlier assessment stages.
+    additions = {
+        "invoice_results": {
+            "customer_name": "VARCHAR(255)",
+            "extraction_method": "VARCHAR(32)",
+            "field_confidence": "JSON",
+        },
+        "validation_errors": {
+            "explanation": "TEXT",
+            "expected_value": "JSON",
+            "observed_value": "JSON",
+        },
+        "manual_corrections": {"reason": "TEXT"},
+        "processing_jobs": {
+            "attempt_count": "INTEGER NOT NULL DEFAULT 0",
+            "worker_id": "VARCHAR(64)",
+            "lease_until": "DATETIME",
+            "next_attempt_at": "DATETIME",
+            "permanent_failure": "BOOLEAN NOT NULL DEFAULT 0",
+        },
+    }
+    inspector = inspect(engine)
+    with engine.begin() as connection:
+        for table, columns in additions.items():
+            if not inspector.has_table(table):
+                continue
+            existing = {column["name"] for column in inspector.get_columns(table)}
+            for name, sql_type in columns.items():
+                if name not in existing:
+                    connection.execute(text(f'ALTER TABLE "{table}" ADD COLUMN "{name}" {sql_type}'))
 
 
 def get_db() -> Generator[Session, None, None]:

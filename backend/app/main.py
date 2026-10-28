@@ -8,6 +8,8 @@ from fastapi.encoders import jsonable_encoder
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.api.health import router as health_router
 from app.api.documents import router as documents_router
+from app.api.v1_documents import router as v1_documents_router
+from app.api.search import router as search_router
 from app.config import get_settings
 from app.database import init_db
 from app.logging_config import configure_logging
@@ -34,6 +36,10 @@ def create_app() -> FastAPI:
                                allow_headers=["Authorization", "Content-Type"])
     application.include_router(health_router)
     application.include_router(documents_router)
+    application.include_router(health_router, prefix="/api")
+    application.include_router(documents_router, prefix="/api")
+    application.include_router(v1_documents_router)
+    application.include_router(search_router)
 
     @application.exception_handler(RequestValidationError)
     async def request_validation_handler(_request: Request, exc: RequestValidationError):
