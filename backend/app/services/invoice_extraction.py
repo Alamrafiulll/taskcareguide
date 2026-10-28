@@ -196,20 +196,28 @@ def _table_line_items(normalized: dict[str, Any]) -> list[dict[str, Any]]:
                     mapping["unit_price"] = idx
                 elif any(token in value for token in ("line total", "amount", "extended", "total")):
                     mapping["line_total"] = idx
-            if "description" not in mapping or len(mapping) < 2 or index + 1 >= len(lines):
+            if "description" not in mapping or len(mapping) < 2:
                 continue
-            values = [cell.strip() for cell in re.split(r"\s*\|\s*|\t+", lines[index + 1].strip())]
-            description = values[mapping["description"]] if mapping["description"] < len(values) else None
-            if not description or _is_summary_description(description):
-                continue
-            def text_cell(key):
-                position = mapping.get(key)
-                return values[position] if position is not None and position < len(values) else None
-            if not any(item.get("source_snippet") == lines[index + 1].strip() for item in items):
-                items.append({"description": description, "quantity": _decimal(text_cell("quantity")),
-                              "unit_price": _decimal(text_cell("unit_price")), "line_total": _decimal(text_cell("line_total")),
-                              "source_page": seg.get("page_number"), "source_sheet": seg.get("sheet_name"),
-                              "source_snippet": lines[index + 1].strip()[:500]})
+            for row_line in lines[index + 1:]:
+                values = [cell.strip() for cell in re.split(r"\s*\|\s*|\t+", row_line.strip())]
+                if len(values) <= mapping["description"]:
+                    continue
+                description = values[mapping["description"]]
+                if not description or _is_summary_description(description):
+                    continue
+
+                def text_cell(key):
+                    position = mapping.get(key)
+                    return values[position] if position is not None and position < len(values) else None
+
+                quantity, unit_price, line_total = (_decimal(text_cell(key)) for key in ("quantity", "unit_price", "line_total"))
+                if not any(value is not None for value in (quantity, unit_price, line_total)):
+                    continue
+                if not any(item.get("source_snippet") == row_line.strip() for item in items):
+                    items.append({"description": description, "quantity": quantity,
+                                  "unit_price": unit_price, "line_total": line_total,
+                                  "source_page": seg.get("page_number"), "source_sheet": seg.get("sheet_name"),
+                                  "source_snippet": row_line.strip()[:500]})
     return items
 
 

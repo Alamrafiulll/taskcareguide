@@ -1,0 +1,335 @@
+{
+  "dataset_name": "Care Guide synthetic invoices v1",
+  "fields": [
+    "invoice_number",
+    "invoice_date",
+    "supplier_name",
+    "customer_name",
+    "subtotal",
+    "tax_amount",
+    "total_amount",
+    "currency",
+    "line_items"
+  ],
+  "normalization": {
+    "strings": "trim and casefold for exact-match scoring",
+    "amounts": "compare as Decimal without tolerance",
+    "date": "ISO YYYY-MM-DD"
+  },
+  "null_policy": "Explicit expected nulls are included in field accuracy and count as exact only when the pipeline returns null. unreadable_fields and skipped_fields are excluded from field accuracy and reported by name.",
+  "documents": [
+    {
+      "file": "valid_invoice.pdf",
+      "expected_invoice": {
+        "invoice_number": "CG-EVAL-1001",
+        "invoice_date": "2026-05-10",
+        "supplier_name": "North Clinic",
+        "customer_name": "Care Guide",
+        "subtotal": "100.00",
+        "tax_amount": "10.00",
+        "total_amount": "110.00",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Care visit",
+            "quantity": "2",
+            "unit_price": "50.00",
+            "line_total": "100.00"
+          },
+          {
+            "description": "Diagnostic kit",
+            "quantity": "1",
+            "unit_price": "0.00",
+            "line_total": "0.00"
+          }
+        ]
+      },
+      "expected_validation_codes": [],
+      "unreadable_fields": [],
+      "skipped_fields": []
+    },
+    {
+      "file": "spreadsheet_valid.xlsx",
+      "expected_invoice": {
+        "invoice_number": "CG-EVAL-1001",
+        "invoice_date": "2026-05-10",
+        "supplier_name": "North Clinic",
+        "customer_name": "Care Guide",
+        "subtotal": "100.00",
+        "tax_amount": "10.00",
+        "total_amount": "110.00",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Care visit",
+            "quantity": "2",
+            "unit_price": "50.00",
+            "line_total": "100.00"
+          },
+          {
+            "description": "Diagnostic kit",
+            "quantity": "1",
+            "unit_price": "0.00",
+            "line_total": "0.00"
+          }
+        ]
+      },
+      "expected_validation_codes": [
+        "duplicate_invoice"
+      ],
+      "expected_duplicate_of": "valid_invoice.pdf",
+      "unreadable_fields": [],
+      "skipped_fields": []
+    },
+    {
+      "file": "missing_invoice_number.csv",
+      "expected_invoice": {
+        "invoice_number": null,
+        "invoice_date": "2026-05-10",
+        "supplier_name": "North Clinic",
+        "customer_name": "Care Guide",
+        "subtotal": "100.00",
+        "tax_amount": "10.00",
+        "total_amount": "110.00",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Care visit",
+            "quantity": "2",
+            "unit_price": "50.00",
+            "line_total": "100.00"
+          },
+          {
+            "description": "Diagnostic kit",
+            "quantity": "1",
+            "unit_price": "0.00",
+            "line_total": "0.00"
+          }
+        ]
+      },
+      "expected_validation_codes": [
+        "required_field_missing",
+        "field_uncertain"
+      ],
+      "unreadable_fields": [],
+      "skipped_fields": []
+    },
+    {
+      "file": "missing_tax.csv",
+      "expected_invoice": {
+        "invoice_number": "CG-EVAL-1003",
+        "invoice_date": "2026-05-10",
+        "supplier_name": "North Clinic",
+        "customer_name": "Care Guide",
+        "subtotal": "100.00",
+        "tax_amount": null,
+        "total_amount": "100.00",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Care visit",
+            "quantity": "2",
+            "unit_price": "50.00",
+            "line_total": "100.00"
+          },
+          {
+            "description": "Diagnostic kit",
+            "quantity": "1",
+            "unit_price": "0.00",
+            "line_total": "0.00"
+          }
+        ]
+      },
+      "expected_validation_codes": [
+        "field_missing"
+      ],
+      "unreadable_fields": [],
+      "skipped_fields": []
+    },
+    {
+      "file": "incorrect_total.pdf",
+      "expected_invoice": {
+        "invoice_number": "CG-EVAL-1002",
+        "invoice_date": "2026-05-10",
+        "supplier_name": "North Clinic",
+        "customer_name": "Care Guide",
+        "subtotal": "120.00",
+        "tax_amount": "12.00",
+        "total_amount": "139.00",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Lab panel",
+            "quantity": "2",
+            "unit_price": "60.00",
+            "line_total": "120.00"
+          }
+        ]
+      },
+      "expected_validation_codes": [
+        "subtotal_tax_total_mismatch"
+      ],
+      "unreadable_fields": [],
+      "skipped_fields": []
+    },
+    {
+      "file": "duplicate_invoice.csv",
+      "expected_invoice": {
+        "invoice_number": "CG-EVAL-1001",
+        "invoice_date": "2026-05-10",
+        "supplier_name": "North Clinic",
+        "customer_name": "Care Guide",
+        "subtotal": "100.00",
+        "tax_amount": "10.00",
+        "total_amount": "110.00",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Care visit",
+            "quantity": "2",
+            "unit_price": "50.00",
+            "line_total": "100.00"
+          },
+          {
+            "description": "Diagnostic kit",
+            "quantity": "1",
+            "unit_price": "0.00",
+            "line_total": "0.00"
+          }
+        ]
+      },
+      "expected_validation_codes": [
+        "duplicate_invoice"
+      ],
+      "expected_duplicate_of": "valid_invoice.pdf",
+      "unreadable_fields": [],
+      "skipped_fields": []
+    },
+    {
+      "file": "uncertain_invoice.png",
+      "expected_invoice": {
+        "invoice_number": null,
+        "invoice_date": "2026-05-10",
+        "supplier_name": "North Clinic",
+        "customer_name": "Care Guide",
+        "subtotal": "100.00",
+        "tax_amount": "10.00",
+        "total_amount": "110.00",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Care visit",
+            "quantity": "2",
+            "unit_price": "50.00",
+            "line_total": "100.00"
+          },
+          {
+            "description": "Diagnostic kit",
+            "quantity": "1",
+            "unit_price": "0.00",
+            "line_total": "0.00"
+          }
+        ]
+      },
+      "expected_validation_codes": [
+        "required_field_missing",
+        "field_uncertain"
+      ],
+      "unreadable_fields": [
+        "invoice_number"
+      ],
+      "skipped_fields": [],
+      "requires_ocr": true
+    },
+    {
+      "file": "scanned_invoice.jpg",
+      "expected_invoice": {
+        "invoice_number": "CG-EVAL-1005",
+        "invoice_date": "2026-05-10",
+        "supplier_name": "North Clinic",
+        "customer_name": "Care Guide",
+        "subtotal": "100.00",
+        "tax_amount": "10.00",
+        "total_amount": "110.00",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Care visit",
+            "quantity": "2",
+            "unit_price": "50.00",
+            "line_total": "100.00"
+          },
+          {
+            "description": "Diagnostic kit",
+            "quantity": "1",
+            "unit_price": "0.00",
+            "line_total": "0.00"
+          }
+        ]
+      },
+      "expected_validation_codes": [],
+      "unreadable_fields": [],
+      "skipped_fields": [],
+      "requires_ocr": true
+    },
+    {
+      "file": "scanned_invoice.pdf",
+      "expected_invoice": {
+        "invoice_number": "CG-EVAL-1005",
+        "invoice_date": "2026-05-10",
+        "supplier_name": "North Clinic",
+        "customer_name": "Care Guide",
+        "subtotal": "100.00",
+        "tax_amount": "10.00",
+        "total_amount": "110.00",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Care visit",
+            "quantity": "2",
+            "unit_price": "50.00",
+            "line_total": "100.00"
+          },
+          {
+            "description": "Diagnostic kit",
+            "quantity": "1",
+            "unit_price": "0.00",
+            "line_total": "0.00"
+          }
+        ]
+      },
+      "expected_validation_codes": [],
+      "unreadable_fields": [],
+      "skipped_fields": [],
+      "requires_ocr": true
+    },
+    {
+      "file": "corrupted.pdf",
+      "expected_invoice": {
+        "invoice_number": null,
+        "invoice_date": null,
+        "supplier_name": null,
+        "customer_name": null,
+        "subtotal": null,
+        "tax_amount": null,
+        "total_amount": null,
+        "currency": null,
+        "line_items": null
+      },
+      "expected_validation_codes": [],
+      "unreadable_fields": [],
+      "skipped_fields": [
+        "invoice_number",
+        "invoice_date",
+        "supplier_name",
+        "customer_name",
+        "subtotal",
+        "tax_amount",
+        "total_amount",
+        "currency",
+        "line_items"
+      ],
+      "expected_processing_failure": true
+    }
+  ]
+}

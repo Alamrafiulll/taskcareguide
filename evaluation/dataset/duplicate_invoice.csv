@@ -1,0 +1,13 @@
+Invoice Number,CG-EVAL-1001
+Invoice Date,2026-05-10
+Supplier,North Clinic
+Customer,Care Guide
+Currency,USD
+Subtotal,100.00
+Tax,10.00
+Total,110.00
+Fixture note,A separate CSV export
+
+Description,Quantity,Unit Price,Line Total
+Care visit,2,50.00,100.00
+Diagnostic kit,1,0.00,0.00

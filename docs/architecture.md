@@ -37,6 +37,14 @@ The `/api/documents` routes provide upload, paginated/filterable list, metadata/
 
 Comparison loads stored invoice fields and line items for the selected IDs. It recommends review and does not claim a match if invoice identity evidence is insufficient. Search returns document metadata and scores only; internal indexed source text and filesystem paths are not returned.
 
+## Browser client
+
+The Vite client talks to the versioned `/api` routes through one fetch/error adapter. Its document view combines a multi-file picker/drop target, per-file response statuses, server-filtered pagination, selected-document details and invoice correction form. The selected detail loads the invoice, validation findings, processing history, and correction audit from separate endpoints. A timer refreshes persisted state while preserving in-progress form edits. Search and comparison views call the corresponding API operations; they do not parse documents or synthesize results in the browser. The frontend test suite mocks HTTP responses and checks interactions/error handling, while backend API tests exercise the real routes with a temporary database.
+
+## Evaluation workflow
+
+`scripts/create_evaluation_dataset.py` creates the small synthetic PDF/image/CSV fixtures and ground-truth manifest; the XLSX fixture is a static, locally authored workbook. `scripts/evaluate.py` queues those files through the same ingestion service and SQLite worker used by the application, then scores stored extraction and validation results against the manifest. It writes a timestamped JSON report with environment/dependency status, per-field exact matches, processing failures, timing, validation checks and explicit OCR-dependent skips. `--benchmark-pages 1000` generates and processes a digital-text PDF incrementally; its timing applies only to the current machine and does not represent scanned OCR or concurrent-load capacity.
+
 ## Search
 
 Keyword search uses a private truncated text index plus invoice metadata filters. Semantic search is implemented using local sentence-transformers embeddings (all-MiniLM-L6-v2 by default) and cosine similarity. Model weights load lazily and use CPU by default. Each document vector is persisted with a model identifier and source-text hash, then regenerated when text changes. Semantic search returns `503` if the optional package/weights are unavailable; keyword search remains usable. Hybrid mode ranks by semantic similarity and adds a bounded bonus for keyword matches. The API caps the candidate corpus and result pagination.
