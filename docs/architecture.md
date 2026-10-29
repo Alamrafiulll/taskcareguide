@@ -33,7 +33,9 @@ Every completed processing job writes a normalized result JSON and text file out
 
 ## REST and review
 
-The `/api/documents` routes provide upload, paginated/filterable list, metadata/status, invoice data, generated JSON download, processing history, validation findings, manual corrections, failed job retry, and two-document comparison. `/api/search` exposes keyword, semantic and hybrid modes. Manual corrections append previous/corrected values, reason, reviewer and timestamp; they update the current result but retain the original extraction JSON and trigger validation again.
+The `/api/documents` routes provide upload, paginated/filterable list, metadata/status, invoice data, original/corrected JSON download, processing history, validation findings, manual corrections, failed job retry, and two-document comparison. `/api/search` exposes keyword, semantic and hybrid modes. Manual corrections append previous/corrected values, reason, reviewer, source, and timestamp; they update the current result but retain the original extraction JSON and trigger validation again.
+
+When enabled, `POST /api/documents/{id}/invoice/ai-suggestions` sends only stored extracted evidence to the configured local Ollama endpoint. Pydantic validation, bounded retries, and evidence grounding apply; only fields already flagged for review are returned. The endpoint does not persist or apply suggestions. The user chooses suggestions in the frontend and saves them through the regular invoice correction request. The correction row and history event identify the selected local model. `correction_status` filters and the frontend AI corrected view are derived from those persisted rows. The result download endpoint composes current corrected invoice fields, validation findings, and audit rows from SQLite; the original view returns the generated extraction JSON unchanged.
 
 Comparison loads stored invoice fields and line items for the selected IDs. It recommends review and does not claim a match if invoice identity evidence is insufficient. Search returns document metadata and scores only; internal indexed source text and filesystem paths are not returned.
 

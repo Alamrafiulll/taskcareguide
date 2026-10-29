@@ -16,7 +16,7 @@ from app.models.document import Document
 from app.models.enums import DocumentStatus
 from app.services.financial_validation import is_duplicate_invoice, validate_invoice
 from app.services.invoice_comparison import compare_invoices
-from app.services.invoice_extraction import extract_invoice
+from app.services.invoice_extraction import extract_invoice, suggest_invoice_corrections
 from app.services.ingestion import DocumentIngestionService
 from app.api.documents import router as documents_router
 from app.database import get_db
@@ -75,6 +75,27 @@ def test_unreadable_value_remains_null_and_uncertain():
     result = extract_invoice(normalized(text))
     assert result["invoice_number"] is None
     assert result["field_status"]["invoice_number"] == GROUND_TRUTH["unreadable_invoice_number"]["status"]
+
+
+def test_local_model_suggestions_only_return_grounded_fields_flagged_for_review(monkeypatch):
+    import app.services.invoice_extraction as extraction
+
+    settings = Settings(_env_file=None, ollama_enabled=True, ollama_model="local-test-model")
+    source = normalized(total="220.00")
+    source_invoice = extract_invoice(source)
+    candidate = extraction.InvoiceExtraction.model_validate({
+        field: source_invoice[field] for field in extraction.InvoiceExtraction.model_fields
+    })
+    current = extract_invoice(normalized(total="221.00"))
+    source["invoice_validation"] = validate_invoice(current)
+    monkeypatch.setattr(extraction, "_ollama_extract", lambda *_: candidate)
+
+    result = suggest_invoice_corrections(source, current, settings)
+    assert result["model"] == "local-test-model"
+    assert [item["field"] for item in result["suggestions"]] == ["total_amount"]
+    assert result["suggestions"][0]["current_value"] == "221.00"
+    assert result["suggestions"][0]["suggested_value"] == "220.00"
+    assert "Total: 220.00" in result["suggestions"][0]["evidence"]
 
 
 def test_ocr_and_conflicting_source_values_are_flagged_for_human_review():

@@ -12,7 +12,7 @@ SQLite is the default local store. SQLAlchemy initializes the tables and applies
 | `line_items` | Ordered child rows of invoice results with description, exact-decimal quantity/unit price/amount and source context in the normalized result JSON. |
 | `validation_errors` | Explainable findings attached to an invoice result: severity, code, field, explanation, expected/observed values and timestamp. Replaced when a correction triggers a fresh full validation pass. |
 | `processing_history` | Append-oriented event log for upload, claim/start, progress, completion, error, retry request and manual review/correction, with timestamps and event metadata. |
-| `manual_corrections` | Audit entries tied to documents, including field, prior value, corrected value, optional reviewer/reason and creation time. Current values are updated, but original extracted JSON is retained. |
+| `manual_corrections` | Audit entries tied to documents, including field, prior value, corrected value, reviewer/reason, correction source (`human` or reviewer-accepted `local_model`), and creation time. Current values are updated, but original extracted JSON is retained. |
 | `worker_heartbeats` | Latest worker liveness and currently claimed job, used by readiness reporting and abandoned lease recovery. |
 | `document_search_index` | Private bounded text index used for keyword matching. Search endpoints never return this raw text. |
 | `document_embeddings` | One local JSON vector per document/model with source-text hash and timestamp. Updated when indexed text changes; used for cosine similarity, not an external service. |

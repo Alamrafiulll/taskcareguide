@@ -68,5 +68,6 @@ class ManualCorrection(Base):
     corrected_value: Mapped[dict] = mapped_column(JSON, nullable=False)
     corrected_by: Mapped[str | None] = mapped_column(String(255))
     reason: Mapped[str | None] = mapped_column(Text)
+    correction_source: Mapped[str] = mapped_column(String(24), default="human", nullable=False)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), server_default=func.now(), nullable=False)
     document = relationship("Document", back_populates="corrections")

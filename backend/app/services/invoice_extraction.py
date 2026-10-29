@@ -413,3 +413,75 @@ def extract_invoice(normalized: dict[str, Any], settings: Settings | None = None
                    "ollama_model": settings.ollama_model if method.endswith("ollama") else None,
                    "ollama_retry_limit": RETRY_LIMIT if settings.ollama_enabled else 0}})
     return result
+
+
+def suggest_invoice_corrections(normalized: dict[str, Any], current_invoice: dict[str, Any],
+                                settings: Settings | None = None) -> dict[str, Any] | None:
+    """Return evidence-grounded local-model proposals for fields already flagged for review.
+
+    This function never persists or applies suggestions. A reviewer must approve them
+    through the ordinary invoice correction endpoint.
+    """
+    settings = settings or get_settings()
+    evidence_sources = _segments_evidence(normalized)
+    evidence_lines = [line.strip() for source in evidence_sources
+                      for line in source["text"].splitlines() if line.strip()]
+    evidence_text = "\n".join(source["text"] for source in evidence_sources)
+    candidate = _ollama_extract(settings, evidence_text)
+    if candidate is None:
+        return None
+
+    review_fields = set()
+    for warning in current_invoice.get("warnings") or []:
+        field = warning.get("field")
+        if field:
+            review_fields.add(field)
+    for finding in normalized.get("invoice_validation") or []:
+        field = finding.get("field")
+        if field:
+            review_fields.add(field.split(".", 1)[0].split("[", 1)[0])
+    statuses = current_invoice.get("field_status") or {}
+    review_fields.update(field for field, state in statuses.items()
+                         if state in {"missing", "uncertain", "low_confidence"})
+
+    def as_json(value: Any) -> Any:
+        if isinstance(value, Decimal):
+            return str(value)
+        return value.model_dump(mode="json") if hasattr(value, "model_dump") else value
+
+    def same_value(field: str, left: Any, right: Any) -> bool:
+        if field in {"subtotal", "tax_amount", "total_amount"}:
+            return _decimal(left) == _decimal(right)
+        if field == "line_items":
+            def signature(items):
+                return [(" ".join(str(item.get("description") or "").casefold().split()),
+                         _decimal(item.get("quantity")), _decimal(item.get("unit_price")),
+                         _decimal(item.get("line_total", item.get("amount")))) for item in items or []]
+            return signature(left) == signature(right)
+        return " ".join(str(left or "").strip().casefold().split()) == " ".join(str(right or "").strip().casefold().split())
+
+    proposals = []
+    for field in [*FIELD_LABELS, "currency"]:
+        old = current_invoice.get(field)
+        new = as_json(getattr(candidate, field))
+        if new is None or field not in review_fields or same_value(field, old, new):
+            continue
+        refs = []
+        for line in evidence_lines:
+            if _grounded(getattr(candidate, field), line):
+                refs.append(line[:500])
+            if len(refs) == 3:
+                break
+        if refs:
+            proposals.append({"field": field, "current_value": old,
+                              "suggested_value": new, "evidence": refs})
+
+    current_items = current_invoice.get("line_items") or []
+    proposed_items = [item.model_dump(mode="json") for item in candidate.line_items]
+    if "line_items" in review_fields and proposed_items and not same_value("line_items", current_items, proposed_items):
+        snippets = [item.get("source_snippet") for item in proposed_items if item.get("source_snippet")]
+        if len(snippets) == len(proposed_items) and all(_grounded(item.get("description"), evidence_text)
+                                                         for item in proposed_items):
+            proposals.append({"field": "line_items", "current_value": current_items,
+                              "suggested_value": proposed_items, "evidence": snippets[:6]})
+    return {"model": settings.ollama_model, "suggestions": proposals}

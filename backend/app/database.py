@@ -51,7 +51,7 @@ def init_db() -> None:
             "expected_value": "JSON",
             "observed_value": "JSON",
         },
-        "manual_corrections": {"reason": "TEXT"},
+        "manual_corrections": {"reason": "TEXT", "correction_source": "VARCHAR(24) NOT NULL DEFAULT 'human'"},
         "processing_jobs": {
             "attempt_count": "INTEGER NOT NULL DEFAULT 0",
             "worker_id": "VARCHAR(64)",

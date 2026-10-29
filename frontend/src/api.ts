@@ -33,6 +33,7 @@ export type DocumentSummary = {
   invoice_number?: string | null; supplier_name?: string | null; customer_name?: string | null
   invoice_date?: string | null; currency?: string | null; validation_status?: string | null
   validation_error_count: number; error_details?: string | null; job?: Job | null
+  correction_status?: 'pending' | 'needs_review' | 'ai_corrected' | 'human_corrected' | 'not_needed'
 }
 export type Page<T> = { total: number; page: number; page_size: number; items: T[] }
 export type InvoiceLine = { id?: number; description: string; quantity?: string | null; unit_price?: string | null; amount?: string | null; line_total?: string | null }
@@ -45,7 +46,9 @@ export type Invoice = {
 }
 export type ValidationFinding = { id?: number; code: string; field?: string; field_name?: string; severity: string; message: string; explanation?: string; expected_value?: unknown; observed_value?: unknown }
 export type HistoryEvent = { id: number; event_type: string; status?: string | null; details?: string | null; event_data?: Record<string, unknown> | null; created_at: string }
-export type CorrectionEvent = { id: number; document_id: number; field_name: string; previous_value: unknown; corrected_value: unknown; corrected_by?: string | null; reason?: string | null; created_at: string }
+export type CorrectionEvent = { id: number; document_id: number; field_name: string; previous_value: unknown; corrected_value: unknown; corrected_by?: string | null; correction_source?: string; reason?: string | null; created_at: string }
+export type AISuggestion = { field: string; current_value: unknown; suggested_value: unknown; evidence: string[] }
+export type AISuggestionResponse = { document_id: number; status: 'suggestions_ready' | 'no_changes'; model: string; suggestions: AISuggestion[] }
 
 export function formatMoney(value: string | null | undefined, currency?: string | null): string {
   if (value == null || value === '') return 'Not found'

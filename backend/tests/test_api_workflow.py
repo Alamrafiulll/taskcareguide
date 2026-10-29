@@ -1,4 +1,5 @@
 import io
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -99,6 +100,55 @@ def test_upload_queues_persisted_documents_worker_results_search_and_comparison(
     corrections = client.get(f"/api/documents/{ids[0]}/invoice/corrections")
     assert corrections.status_code == 200 and len(corrections.json()) == 2
     assert corrections.json()[0]["reason"] == "Verified against source"
+
+
+def test_local_model_suggestions_are_reviewed_saved_filtered_and_downloadable(api_context, monkeypatch):
+    client, settings, factory = api_context
+    upload = client.post("/api/documents/upload", files=[
+        ("files", ("needs-review.csv", make_csv(total="221.00"), "text/csv"))])
+    document_id = upload.json()["items"][0]["document_id"]
+    worker = DocumentWorker(settings, factory, DocumentIngestionService(settings), worker_id="ai-review-worker")
+    assert worker.run_once()
+
+    settings.ollama_enabled = True
+    settings.ollama_model = "local-test-model"
+    import app.api.v1_documents as v1
+    monkeypatch.setattr(v1, "suggest_invoice_corrections", lambda *_: {
+        "model": "local-test-model", "suggestions": [{"field": "total_amount",
+            "current_value": "221.00", "suggested_value": "220.00", "evidence": ["Total,221.00"]}],
+    })
+    suggestions = client.post(f"/api/documents/{document_id}/invoice/ai-suggestions")
+    assert suggestions.status_code == 200
+    assert suggestions.json()["suggestions"][0]["suggested_value"] == "220.00"
+    before = client.get(f"/api/documents/{document_id}/result?view=original")
+    assert before.status_code == 200
+    assert json.loads(before.content)["invoice"]["total_amount"] == "221.00"
+
+    corrected = client.put(f"/api/documents/{document_id}/invoice", json={
+        "total_amount": "220.00", "correction_source": "local_model",
+        "correction_model": "local-test-model", "corrected_by": "Reviewer accepted local model suggestion",
+        "reason": "Accepted after checking source evidence",
+    })
+    assert corrected.status_code == 200
+    assert corrected.json()["total_amount"] == "220.00"
+    audit = client.get(f"/api/documents/{document_id}/invoice/corrections").json()
+    assert audit[-1]["correction_source"] == "local_model"
+    assert audit[-1]["previous_value"] == {"value": "221.00"}
+    ai_view = client.get("/api/documents", params={"correction_status": "ai_corrected"}).json()
+    assert [item["id"] for item in ai_view["items"]] == [document_id]
+
+    after = client.get(f"/api/documents/{document_id}/result?view=corrected")
+    corrected_json = json.loads(after.content)
+    assert corrected_json["invoice"]["total_amount"] == "220.00"
+    assert corrected_json["correction_status"] == "ai_corrected"
+    assert corrected_json["correction_history"][-1]["correction_source"] == "local_model"
+
+
+def test_local_ai_suggestions_return_clear_disabled_response(api_context):
+    client, _settings, _factory = api_context
+    response = client.post("/api/documents/99999/invoice/ai-suggestions")
+    assert response.status_code == 503
+    assert response.json()["detail"]["code"] == "local_ai_disabled"
 
 
 def test_upload_rejects_unsupported_formats_and_invalid_ids(api_context):

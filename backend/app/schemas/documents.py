@@ -53,6 +53,7 @@ class DocumentSummary(APIModel):
     invoice_date: str | None = None
     validation_status: str | None = None
     validation_error_count: int = 0
+    correction_status: str = "not_needed"
 
 
 class DocumentPage(APIModel):
@@ -86,6 +87,8 @@ class InvoiceEditLineItem(APIModel):
 class InvoiceEditRequest(APIModel):
     reason: str | None = Field(default=None, max_length=2000)
     corrected_by: str | None = Field(default=None, max_length=255)
+    correction_source: Literal["human", "local_model"] = "human"
+    correction_model: str | None = Field(default=None, max_length=127)
     invoice_number: str | None = None
     invoice_date: str | None = None
     supplier_name: str | None = None

@@ -19,12 +19,12 @@ const invoice = {
 }
 const history = [{ id: 1, event_type: 'processing_completed', status: 'completed', details: 'Invoice extraction completed.', event_data: null, created_at: '2026-05-01T10:00:00Z' }]
 
-function mockApi(options: { uploadError?: boolean; documents?: ReturnType<typeof row>[] } = {}) {
+function mockApi(options: { uploadError?: boolean; localAI?: boolean; documents?: ReturnType<typeof row>[] } = {}) {
   const calls: Array<{ url: string; init?: RequestInit }> = []
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
     calls.push({ url, init })
-    if (url.endsWith('/api/ready')) return Response.json({ status: 'ready', checks: { database: 'ok', worker: 'ok', ocr: 'optional_not_installed', local_ai: 'disabled' } })
+    if (url.endsWith('/api/ready')) return Response.json({ status: 'ready', checks: { database: 'ok', worker: 'ok', ocr: 'optional_not_installed', local_ai: options.localAI ? 'enabled' : 'disabled' } })
     if (url.includes('/api/documents/upload') && init?.method === 'POST') {
       if (options.uploadError) return Response.json({ error: { code: 'invalid_signature', message: 'The selected PDF is not a valid PDF file.' } }, { status: 422 })
       options.documents = [row({ filename: 'new-invoice.csv', id: 45, status: 'queued', job: { status: 'queued', retry_count: 0, attempt_count: 0, permanent_failure: false } })]
@@ -33,6 +33,11 @@ function mockApi(options: { uploadError?: boolean; documents?: ReturnType<typeof
     if (url.includes('/api/documents?')) return Response.json(page(options.documents ?? []))
     if (url.endsWith('/api/documents/44/invoice') && init?.method === 'PUT') return Response.json(invoice)
     if (url.endsWith('/api/documents/44/invoice')) return Response.json(invoice)
+    if (url.endsWith('/api/documents/44/invoice/ai-suggestions') && init?.method === 'POST') return Response.json({
+      document_id: 44, status: 'suggestions_ready', model: 'local-test-model', suggestions: [
+        { field: 'total_amount', current_value: '125.00', suggested_value: '120.00', evidence: ['Total: 120.00'] },
+      ],
+    })
     if (url.endsWith('/api/documents/44/history')) return Response.json(history)
     if (url.endsWith('/api/documents/44/validation-errors')) return Response.json(invoice.validation_errors.map(({ field_name, ...item }) => ({ ...item, field: field_name })))
     if (url.endsWith('/api/documents/44/invoice/corrections')) return Response.json([])
@@ -87,6 +92,24 @@ describe('document workspace', () => {
     expect(screen.getByText('Verify date against the source.')).toBeTruthy()
     expect(screen.getByLabelText('Line 1 description')).toHaveProperty('value', 'Consultation')
     expect(screen.getByText('processing completed')).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Download original JSON' })).toHaveProperty('href', expect.stringContaining('view=original'))
+    expect(screen.getByRole('link', { name: 'Download current JSON' })).toHaveProperty('href', expect.stringContaining('view=corrected'))
+  })
+
+  it('shows local model proposals, stages reviewer-selected values, and saves them with model provenance', async () => {
+    const { calls } = mockApi({ localAI: true, documents: [row()] })
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: /therapy-invoice.pdf/ }))
+    await user.click(await screen.findByRole('button', { name: 'Suggest corrections with Ollama' }))
+    expect(await screen.findByText('Total: 120.00')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Use selected suggestions in form' }))
+    expect(screen.getByLabelText('Total amount')).toHaveProperty('value', '120.00')
+    await user.click(screen.getByRole('button', { name: 'Save corrections' }))
+    const save = calls.find((call) => call.url.endsWith('/api/documents/44/invoice') && call.init?.method === 'PUT')
+    expect(JSON.parse(String(save?.init?.body)).correction_source).toBe('local_model')
+    expect(JSON.parse(String(save?.init?.body)).correction_model).toBe('local-test-model')
+    expect(await screen.findByText('Correction saved. Validation was rerun and the audit history was updated.')).toBeTruthy()
   })
 
   it('prevents unsupported files before sending them to the API', async () => {

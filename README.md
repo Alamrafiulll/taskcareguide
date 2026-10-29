@@ -120,6 +120,9 @@ All assessment endpoints are under `/api`.
 - `GET /api/documents` — paginated listing with invoice, supplier, customer, currency, date, processing, validation, and keyword filters.
 - `GET /api/documents/{id}`, `/status`, `/history`, `/validation-errors`, `/invoice`, `/result` — stored metadata, status, audit history, checks, invoice JSON, or generated JSON download.
 - `PUT /api/documents/{id}/invoice` — correct invoice fields and line items with optional reason; stores the original extraction, validates the updated record, and appends correction audit rows.
+- `POST /api/documents/{id}/invoice/ai-suggestions` — when local Ollama is enabled, returns schema-validated, source-grounded proposals only for fields flagged for review. It never applies them. The reviewer selects proposals in the UI and explicitly saves them through the correction endpoint; the audit records the local model and acceptance.
+- `GET /api/documents?correction_status=needs_review|ai_corrected|human_corrected|not_needed` — persisted views for documents needing attention and documents whose local-model suggestions a reviewer accepted.
+- `GET /api/documents/{id}/result?view=original|corrected` — download the untouched extracted result or a JSON view assembled from the current corrected database result and correction audit.
 - `POST /api/documents/{id}/retry` — requeues eligible failed jobs; permanently invalid sources and exhausted retry limits are rejected.
 - `GET /api/search?query=...&mode=keyword|semantic|hybrid` — keyword search or real persisted-vector cosine ranking; hybrid combines semantic ranking with exact keyword matches. Search returns metadata only, never storage paths or raw source text.
 - `POST /api/documents/compare` — compares two explicitly selected persisted invoice extractions when invoice identity evidence supports the pairing.
@@ -134,7 +137,7 @@ Invoice financial values use `Decimal`; `INVOICE_ROUNDING_TOLERANCE` defaults to
 
 ## Frontend workflow
 
-The React workspace is a real API client. It supports multi-file upload with per-file feedback, paginated/filterable queue review, stored invoice/evidence/validation/history details, manual invoice and line-item corrections, correction audit display, eligible failed-job retries, metadata-only keyword/semantic/hybrid search, and comparison of two selected completed documents. It polls saved document/history state for updates and does not display invented progress percentages. Semantic and hybrid search need the optional local embedding model; the rest of the frontend remains available without it. Vitest and Testing Library exercise upload, API error feedback, invoice review, and file-type validation.
+The React workspace is a real API client. It supports multi-file upload with per-file feedback, paginated/filterable queue review, stored invoice/evidence/validation/history details, manual invoice and line-item corrections, optional evidence-grounded Ollama suggestions with reviewer approval, before/after comparison, original/corrected JSON downloads, eligible failed-job retries, metadata-only keyword/semantic/hybrid search, and comparison of two selected completed documents. Its Needs correction and AI corrected views are backed by persisted validation and correction history. It polls saved document/history state for updates and does not display invented progress percentages. Semantic and hybrid search need the optional local embedding model; model correction suggestions need Ollama; the rest of the frontend remains available without either. Vitest and Testing Library exercise upload, API error feedback, invoice review, and file-type validation.
 
 ## API request examples (PowerShell)
 
@@ -157,7 +160,8 @@ Invoke-RestMethod "http://127.0.0.1:8000/api/documents/$documentId" | ConvertTo-
 Invoke-RestMethod "http://127.0.0.1:8000/api/documents/$documentId/invoice" | ConvertTo-Json -Depth 12
 Invoke-RestMethod "http://127.0.0.1:8000/api/documents/$documentId/history" | ConvertTo-Json -Depth 8
 Invoke-RestMethod "http://127.0.0.1:8000/api/documents/$documentId/validation-errors" | ConvertTo-Json -Depth 8
-Invoke-WebRequest "http://127.0.0.1:8000/api/documents/$documentId/result" -OutFile .\result.json
+Invoke-WebRequest "http://127.0.0.1:8000/api/documents/$documentId/result?view=original" -OutFile .\original-result.json
+Invoke-WebRequest "http://127.0.0.1:8000/api/documents/$documentId/result?view=corrected" -OutFile .\corrected-result.json
 ```
 
 List with filters and keyword search:
@@ -177,6 +181,12 @@ $body = @{
 } | ConvertTo-Json
 Invoke-RestMethod -Method Put -Uri "http://127.0.0.1:8000/api/documents/$documentId/invoice" -ContentType "application/json" -Body $body | ConvertTo-Json -Depth 12
 Invoke-RestMethod "http://127.0.0.1:8000/api/documents/$documentId/invoice/corrections" | ConvertTo-Json -Depth 8
+```
+
+Optional local Ollama review returns suggestions without changing the saved invoice. The frontend displays each proposal with its source snippet; stage selected values in the form and explicitly save them to record accepted corrections.
+
+```powershell
+Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/api/documents/$documentId/invoice/ai-suggestions" | ConvertTo-Json -Depth 10
 ```
 
 Compare two selected stored results, retry eligible failures, or check readiness:

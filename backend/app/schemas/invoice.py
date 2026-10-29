@@ -95,7 +95,22 @@ class ManualCorrectionRead(APIModel):
     corrected_value: dict
     corrected_by: str | None
     reason: str | None = None
+    correction_source: str = "human"
     created_at: datetime
+
+
+class InvoiceCorrectionSuggestion(APIModel):
+    field: str
+    current_value: object
+    suggested_value: object
+    evidence: list[str] = Field(default_factory=list)
+
+
+class InvoiceCorrectionSuggestionsRead(APIModel):
+    document_id: int
+    status: str
+    model: str
+    suggestions: list[InvoiceCorrectionSuggestion] = Field(default_factory=list)
 
 
 class InvoiceComparisonRequest(APIModel):
