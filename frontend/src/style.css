@@ -194,3 +194,102 @@ tbody tr:hover, tbody tr.row-selected { background: #f5f9f5; }
   .footer { flex-direction: column; padding: 15px 18px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; } }
+
+/* Plain-language, lower-clutter workspace refinements. */
+:root { font-size: 16px; }
+.topbar { gap: clamp(16px, 3vw, 36px); }
+.main-nav { gap: 18px; }
+.main-nav button, .nav-tools > summary { font-size: 14px; }
+.nav-tools { position: relative; display: flex; align-items: center; color: #75867c; font-size: 14px; }
+.nav-tools > summary { display: flex; align-items: center; height: 100%; padding: 0 4px; border-bottom: 2px solid transparent; cursor: pointer; list-style: none; }
+.nav-tools > summary::-webkit-details-marker { display: none; }
+.nav-tools > summary::after { content: '⌄'; margin-left: 6px; }
+.nav-tools > summary.active, .nav-tools[open] > summary { color: #315e4c; border-bottom-color: #5b8c6a; }
+.nav-tools-menu { position: absolute; z-index: 8; top: calc(100% - 5px); left: -14px; display: grid; min-width: 190px; padding: 7px; border: 1px solid #dce5dc; border-radius: 9px; background: white; box-shadow: 0 12px 30px #263c2e18; }
+.nav-tools-menu button { min-height: 40px; padding: 8px 10px; border: 0; border-radius: 6px; color: #315e4c; background: white; text-align: left; font-size: 14px; }
+.nav-tools-menu button:hover { background: #f1f6f1; }
+.workspace { padding-top: 30px; }
+.page-heading { margin-bottom: 18px; }
+.eyebrow { font-size: 11px; }
+.subheading { font-size: 15px; }
+.heading-meta { font-size: 13px; }
+.heading-meta span:first-child { font-size: 16px; }
+.workflow-guide { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0 0 18px; padding: 0; list-style: none; }
+.workflow-guide li { display: flex; align-items: center; gap: 12px; min-height: 76px; padding: 12px 15px; border: 1px solid #e0e7df; border-radius: 10px; background: #ffffffd9; }
+.workflow-guide li > span { display: grid; place-items: center; width: 34px; height: 34px; flex: 0 0 auto; border-radius: 50%; color: white; background: #477656; font-size: 16px; font-weight: 700; }
+.workflow-guide strong, .workflow-guide small { display: block; }
+.workflow-guide strong { margin-bottom: 4px; color: #254438; font-size: 14px; }
+.workflow-guide small { color: #718178; font-size: 12px; line-height: 1.4; }
+.upload-panel, .documents-section, .detail-section, .tool-page { padding: clamp(18px, 2.4vw, 28px); }
+.section-title h2 { margin-bottom: 5px; }
+.section-hint { margin: 5px 0 0; color: #718178; font-size: 13px; }
+.format-note { font-size: 12px; }
+.dropzone { min-height: 120px; padding: 22px; }
+.dropzone strong { font-size: 16px; }
+.dropzone p { font-size: 13px; }
+.button { min-height: 42px; padding: 0 16px; font-size: 13px; }
+.upload-actions { margin-top: 16px; }
+.upload-actions small, .save-row small { font-size: 12px; }
+.filters-disclosure { margin-bottom: 18px; }
+.filters-disclosure > summary, .optional-panel > summary, .review-more > summary, .download-options > summary { color: #315e4c; cursor: pointer; font-size: 14px; font-weight: 700; }
+.filters-disclosure > summary { padding: 12px 14px; border: 1px solid #e0e8e0; border-radius: 8px; background: #f8faf7; }
+.filters-disclosure[open] > summary { margin-bottom: 14px; }
+.filters { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 4px 2px; }
+label { gap: 7px; font-size: 13px; }
+input, select { height: 44px; padding: 0 12px; border-radius: 7px; font-size: 14px; }
+.document-table { min-width: 680px; }
+th { padding: 12px; font-size: 11px; }
+td { padding: 14px 12px; font-size: 13px; }
+.document-link { font-size: 14px; }
+.document-link small, .status-caption { font-size: 11px; }
+.status-tag, .review-tag { padding: 6px 9px; font-size: 10px; }
+.pagination { font-size: 12px; }
+.detail-section { scroll-margin-top: 90px; }
+.detail-header { align-items: start; }
+.detail-header .subheading { max-width: 680px; }
+.detail-actions { flex-wrap: wrap; justify-content: flex-end; }
+.detail-actions .button { min-height: 42px; }
+.download-options { position: relative; }
+.download-options > summary { padding: 12px 2px; color: #315e4c; cursor: pointer; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.download-options > a { position: absolute; z-index: 3; top: 100%; right: 0; min-width: 175px; padding: 12px; border: 1px solid #dce5dc; border-radius: 7px; color: #315e4c; background: white; box-shadow: 0 8px 18px #263c2e18; font-size: 13px; text-decoration: none; }
+.review-grid { grid-template-columns: minmax(0, 1.5fr) minmax(270px, .8fr); gap: 18px; }
+.card { padding: 21px; border-radius: 10px; }
+.card h3 { font-size: 19px; }
+.help-text { margin: -4px 0 18px; color: #65766b; font-size: 14px; line-height: 1.55; }
+.field-grid { gap: 16px; }
+.invoice-form { gap: 18px; }
+.invoice-form label { font-size: 13px; }
+.line-items-heading h4 { font-size: 16px; }
+.line-table th { font-size: 10px; }
+.line-table input { height: 40px; }
+.muted { color: #69786f; font-size: 13px; line-height: 1.5; }
+.finding { padding: 12px 14px; font-size: 13px; line-height: 1.45; }
+.finding strong { font-size: 13px; }
+.finding small { font-size: 12px; }
+.confidence-note { font-size: 12px; }
+.optional-panel { display: block; }
+.optional-panel > summary { margin-bottom: 10px; }
+.optional-panel:not([open]) > summary { margin-bottom: 0; }
+.review-more { display: grid; gap: 12px; margin-top: 14px; }
+.review-more > summary { padding: 14px 16px; border: 1px solid #e0e8e0; border-radius: 8px; background: #f8faf7; }
+.review-more[open] > summary { margin-bottom: 4px; }
+.review-more > .card { margin-top: 10px; }
+.banner { font-size: 13px; }
+.footer { font-size: 12px; }
+
+@media (max-width: 850px) {
+  .topbar { height: auto; min-height: 72px; gap: 14px; flex-wrap: wrap; padding-top: 10px; padding-bottom: 10px; }
+  .main-nav { height: 40px; }
+  .connection { font-size: 12px; }
+  .workflow-guide { grid-template-columns: 1fr; gap: 8px; }
+  .workflow-guide li { min-height: 62px; }
+  .review-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 650px) {
+  .filters { grid-template-columns: 1fr; }
+  .detail-actions { justify-content: flex-start; }
+  .detail-actions .button { white-space: normal; }
+  .workflow-guide small { font-size: 11px; }
+  .upload-actions { align-items: stretch; flex-direction: column; }
+  .upload-actions .button { width: 100%; }
+}

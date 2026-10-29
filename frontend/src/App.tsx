@@ -14,8 +14,27 @@ function invoiceWarnings(invoice: Invoice | null): ValidationFinding[] {
   return raw?.warnings ?? []
 }
 function progressText(row: DocumentSummary): string {
-  if (row.status !== 'processing') return row.status === 'queued' ? 'Waiting for the worker' : row.status
-  return 'Worker is processing this document'
+  if (row.status === 'queued') return 'Waiting to start'
+  if (row.status === 'processing') return 'Reading document'
+  if (row.status === 'completed') return 'Ready to review'
+  if (row.status === 'failed') return 'Could not process'
+  return row.status
+}
+function statusLabel(status: string): string {
+  if (status === 'queued') return 'Waiting'
+  if (status === 'processing') return 'In progress'
+  if (status === 'completed') return 'Ready'
+  if (status === 'failed') return 'Needs attention'
+  return status
+}
+function friendlyProcessingError(value: string): string {
+  try {
+    const parsed = JSON.parse(value) as unknown
+    const items = Array.isArray(parsed) ? parsed : [parsed]
+    const messages = items.flatMap((item) => item && typeof item === 'object' && 'message' in item && typeof item.message === 'string' ? [item.message] : [])
+    if (messages.length) return messages.join(' ')
+  } catch { /* Keep ordinary error text as written. */ }
+  return value
 }
 function auditValue(value: unknown): string {
   if (value && typeof value === 'object' && 'value' in value) return String((value as { value?: unknown }).value ?? '—')
@@ -126,6 +145,12 @@ export default function App() {
     else { setMetadata(null); setInvoice(null); setHistory([]); setCorrectionHistory([]); setFindings([]) }
   }, [selectedId, loadDetail])
 
+  useEffect(() => {
+    if (selectedId !== null && metadata?.id === selectedId && !loadingDetail) {
+      document.getElementById('detail-section')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+    }
+  }, [selectedId, metadata?.id, loadingDetail])
+
   const pageCount = Math.max(1, Math.ceil((documents?.total ?? 0) / pageSize))
   const processingEvent = [...history].reverse().find((event) => event.event_type === 'progress')
   const evidence = (invoice?.raw_extraction?.invoice as { field_evidence?: Record<string, Array<{ snippet?: string; page?: number; sheet?: string; cell_coordinates?: string[] }>> } | undefined)?.field_evidence ?? {}
@@ -181,7 +206,7 @@ export default function App() {
     try {
       const response = await api<{ accepted_count: number; rejected_count: number; items: UploadItem[] }>('/documents/upload', { method: 'POST', body })
       setUploadItems(response.items); setFiles([])
-      setNotice(`${response.accepted_count} file${response.accepted_count === 1 ? '' : 's'} queued; ${response.rejected_count} rejected.`)
+      setNotice(`${response.accepted_count} file${response.accepted_count === 1 ? '' : 's'} added. Processing will start in the background.${response.rejected_count ? ` ${response.rejected_count} could not be added.` : ''}`)
       setPage(1)
       await loadDocuments(1, appliedFilters)
       const first = response.items.find((item) => item.document_id && item.status === 'queued')
@@ -306,12 +331,16 @@ export default function App() {
       <a className="brand" href="#documents" onClick={() => setView('documents')}><span className="brand-mark">cg</span><span>Care Guide<small>DOCUMENT INTELLIGENCE</small></span></a>
       <nav className="main-nav" aria-label="Workspace">
         <button className={view === 'documents' && !appliedFilters.correction_status ? 'active' : ''} onClick={() => { setView('documents'); setFilterForm({ ...filterForm, correction_status: '' }); setAppliedFilters({ ...appliedFilters, correction_status: '' }) }}>Documents</button>
-        <button className={appliedFilters.correction_status === 'needs_review' ? 'active' : ''} onClick={() => openCorrectionView('needs_review')}>Needs correction</button>
-        <button className={appliedFilters.correction_status === 'ai_corrected' ? 'active' : ''} onClick={() => openCorrectionView('ai_corrected')}>AI corrected</button>
-        <button className={view === 'search' ? 'active' : ''} onClick={() => setView('search')}>Search</button>
-        <button className={view === 'compare' ? 'active' : ''} onClick={() => setView('compare')}>Compare</button>
+        <button className={appliedFilters.correction_status === 'needs_review' ? 'active' : ''} onClick={() => openCorrectionView('needs_review')}>Needs review</button>
+        <details className="nav-tools">
+          <summary className={view === 'search' || view === 'compare' ? 'active' : ''}>More tools</summary>
+          <div className="nav-tools-menu">
+            <button className={view === 'search' ? 'active' : ''} onClick={() => setView('search')}>Search documents</button>
+            <button className={view === 'compare' ? 'active' : ''} onClick={() => setView('compare')}>Compare invoices</button>
+          </div>
+        </details>
       </nav>
-      <div className="connection" aria-label="Backend readiness"><span className={`status-dot ${readiness?.checks.database === 'ok' ? 'online' : 'offline'}`} /><span>{readiness?.checks.database === 'ok' ? 'API connected' : 'API unavailable'}</span><span className="worker-badge">Worker {readiness?.checks.worker === 'ok' ? 'online' : 'offline'}</span></div>
+      <div className="connection" aria-label="Backend readiness"><span className={`status-dot ${readiness?.checks.database === 'ok' ? 'online' : 'offline'}`} /><span>{readiness?.checks.database === 'ok' ? 'App connected' : 'App not connected'}</span><span className="worker-badge">Processing {readiness?.checks.worker === 'ok' ? 'ready' : 'stopped'}</span></div>
     </header>
 
     <main className="workspace">
@@ -320,22 +349,28 @@ export default function App() {
       </div>}
 
       {view === 'documents' && <>
-        <div className="page-heading"><div><p className="eyebrow">LOCAL WORKSPACE</p><h1>Invoice review</h1><p className="subheading">Upload documents, track processing, and review extracted fields against their source.</p></div><div className="heading-meta"><span>{documents?.total ?? '—'} documents</span><span>SQLite · Local processing</span></div></div>
+        <div className="page-heading"><div><p className="eyebrow">YOUR WORKSPACE</p><h1>Invoice documents</h1><p className="subheading">Add an invoice, check the information we found, and download your reviewed result.</p></div><div className="heading-meta"><span>{documents?.total ?? '—'} documents</span><span>Files stay on this computer</span></div></div>
+        <ol className="workflow-guide" aria-label="How to use the app">
+          <li><span>1</span><div><strong>Add an invoice</strong><small>Choose a PDF, image, or spreadsheet.</small></div></li>
+          <li><span>2</span><div><strong>Wait for processing</strong><small>Keep the worker window running.</small></div></li>
+          <li><span>3</span><div><strong>Review and download</strong><small>Open a document, fix anything marked, then save.</small></div></li>
+        </ol>
         <section className="upload-panel" aria-labelledby="upload-heading">
-          <div className="section-title"><div><p className="eyebrow">INGEST</p><h2 id="upload-heading">Add documents</h2></div><span className="format-note">PDF · JPG · PNG · TIFF · XLS · XLSX · CSV</span></div>
+          <div className="section-title"><div><p className="eyebrow">STEP 1</p><h2 id="upload-heading">Add invoices</h2></div><span className="format-note">PDF, JPG, PNG, TIFF, XLS, XLSX, or CSV</span></div>
           <form onSubmit={uploadFiles}>
             <div className={`dropzone ${dragging ? 'dropzone-active' : ''}`} onDragOver={(event) => { event.preventDefault(); setDragging(true) }} onDragLeave={() => setDragging(false)} onDrop={onDrop}>
-              <div className="upload-icon" aria-hidden="true">↑</div><div><strong>Drop invoices here</strong><p>Choose multiple supported files. Uploads are validated on the server.</p></div>
-              <label className="button button-secondary file-picker">Browse files<input aria-label="Choose invoice files" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,.xlsx,.xls,.csv" onChange={onFileChange} /></label>
+              <div className="upload-icon" aria-hidden="true">↑</div><div><strong>Choose files to get started</strong><p>You can select more than one file. Maximum size: 50 MB each.</p></div>
+              <label className="button button-secondary file-picker">Choose files<input aria-label="Choose invoice files" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,.xlsx,.xls,.csv" onChange={onFileChange} /></label>
             </div>
             {files.length > 0 && <div className="selected-files"><span>{files.length} file{files.length === 1 ? '' : 's'} selected</span><ul>{files.map((file, i) => <li key={`${file.name}-${i}`}>{file.name}<button type="button" aria-label={`Remove ${file.name}`} onClick={() => setFiles((items) => items.filter((_, index) => index !== i))}>Remove</button></li>)}</ul></div>}
-            <div className="upload-actions"><small>Default maximum 50 MiB per file; server validation is authoritative.</small><button className="button button-primary" disabled={!files.length || uploading}>{uploading ? 'Uploading…' : 'Upload and queue'}</button></div>
+            <div className="upload-actions"><small>Scanned documents need Tesseract OCR installed to read text from images.</small><button className="button button-primary" disabled={!files.length || uploading}>{uploading ? 'Adding files…' : 'Add selected invoices'}</button></div>
           </form>
           {uploadItems.length > 0 && <ul className="upload-feedback" aria-label="Upload results">{uploadItems.map((item, i) => <li className={item.status === 'rejected' ? 'is-error' : ''} key={`${item.filename}-${i}`}><strong>{item.filename}</strong><span>{item.status === 'queued' ? `Queued · document ${item.document_id}` : item.status === 'duplicate' ? `Duplicate of document ${item.duplicate_of_document_id}` : item.error?.message ?? item.status}</span></li>)}</ul>}
         </section>
 
         <section className="documents-section" aria-labelledby="documents-heading">
-          <div className="section-title"><div><p className="eyebrow">REVIEW QUEUE</p><h2 id="documents-heading">Documents</h2></div><button className="button button-quiet" onClick={() => void refresh()}>Refresh</button></div>
+          <div className="section-title"><div><p className="eyebrow">STEP 2</p><h2 id="documents-heading">Your invoices</h2><p className="section-hint">Select a file to see its status and extracted invoice information.</p></div><button className="button button-quiet" onClick={() => void refresh()}>Refresh list</button></div>
+          <details className="filters-disclosure"><summary>Find a document or use filters</summary>
           <form className="filters" onSubmit={applyFilters}>
             <label>Keyword<input aria-label="Filter keyword" value={filterForm.keyword} onChange={(e) => changeFilter('keyword', e.target.value)} placeholder="Invoice number or text" /></label>
             <label>Supplier<input aria-label="Filter supplier" value={filterForm.supplier} onChange={(e) => changeFilter('supplier', e.target.value)} placeholder="Supplier name" /></label>
@@ -344,25 +379,27 @@ export default function App() {
             <label>Correction view<select aria-label="Filter correction view" value={filterForm.correction_status} onChange={(e) => changeFilter('correction_status', e.target.value)}><option value="">All documents</option><option value="needs_review">Needs correction</option><option value="ai_corrected">AI corrected</option><option value="human_corrected">Human corrected</option><option value="not_needed">No correction needed</option></select></label>
             <button className="button button-secondary">Apply filters</button>
           </form>
+          </details>
           {loadingList && !documents ? <div className="empty-state">Loading documents…</div> : documents?.items.length ? <>
             <div className="table-wrap"><table className="document-table"><thead><tr><th>Document</th><th>Invoice</th><th>Supplier</th><th>Date</th><th>Status</th><th>Review</th></tr></thead><tbody>
               {documents.items.map((row) => <tr key={row.id} className={selectedId === row.id ? 'row-selected' : ''}>
                 <td><button className="document-link" onClick={() => selectDocument(row.id)}>{row.filename}<small>Document #{row.id}</small></button></td>
                 <td>{row.invoice_number || '—'}</td><td>{row.supplier_name || '—'}</td><td>{row.invoice_date || '—'}</td>
-                <td><span className={`status-tag status-${row.status}`}>{row.status}</span><small className="status-caption">{progressText(row)}</small></td>
+                <td><span className={`status-tag status-${row.status}`}>{statusLabel(row.status)}</span><small className="status-caption">{progressText(row)}</small></td>
                 <td className="review-cell">{row.correction_status === 'ai_corrected' && <span className="review-tag ai-corrected-tag">AI corrected</span>}{row.correction_status === 'human_corrected' && <span className="review-tag">Human corrected</span>}{row.validation_status === 'has_errors' ? <span className="review-tag needs-review">{row.validation_error_count} finding{row.validation_error_count === 1 ? '' : 's'} · review</span> : row.validation_status === 'valid' && row.correction_status !== 'ai_corrected' && row.correction_status !== 'human_corrected' ? 'Clear' : row.validation_status === 'pending' ? 'Pending' : null}</td>
               </tr>)}
             </tbody></table></div>
             <div className="pagination"><span>{documents.total ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, documents.total)} of ${documents.total}` : 'No results'}</span><div><button className="button button-quiet" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</button><span>Page {page} of {pageCount}</span><button className="button button-quiet" disabled={page >= pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>Next</button></div></div>
-          </> : <div className="empty-state"><strong>No documents match these filters.</strong><span>Upload a document or adjust the filters above.</span></div>}
+          </> : <div className="empty-state"><strong>{Object.values(appliedFilters).some(Boolean) ? 'No invoices match those filters.' : 'No invoices added yet.'}</strong><span>{Object.values(appliedFilters).some(Boolean) ? 'Try changing or clearing the filters above.' : 'Add an invoice above to begin. Your results will appear here.'}</span></div>}
         </section>
-        {selectedId !== null && <section className="detail-section" aria-labelledby="detail-heading">
+        {selectedId !== null && <section id="detail-section" className="detail-section" aria-labelledby="detail-heading">
           {loadingDetail ? <div className="empty-state">Loading document details…</div> : metadata && <>
-            <div className="detail-header"><div><p className="eyebrow">DOCUMENT #{metadata.id}</p><h2 id="detail-heading">{metadata.filename}</h2><p className="subheading">{metadata.job ? `Attempt ${metadata.job.attempt_count} · ${metadata.job.status}` : metadata.status}</p></div><div className="detail-actions"><span className={`status-tag status-${metadata.status}`}>{metadata.status}</span>{metadata.status === 'failed' && <button className="button button-secondary" onClick={() => void retryDocument()} disabled={metadata.job?.permanent_failure}>Retry processing</button>}{invoice && <><a className="button button-quiet" href={`${API_BASE}/api/documents/${metadata.id}/result?view=original`} target="_blank" rel="noreferrer">Download original JSON</a><a className="button button-primary" href={`${API_BASE}/api/documents/${metadata.id}/result?view=corrected`} target="_blank" rel="noreferrer">Download current JSON</a></>}</div></div>
+            <div className="detail-header"><div><p className="eyebrow">STEP 3 · REVIEW</p><h2 id="detail-heading">{metadata.filename}</h2><p className="subheading">{metadata.status === 'completed' ? 'Check the information below. You can leave correct fields as they are.' : metadata.status === 'failed' ? 'Processing stopped. Check the message and try again if available.' : 'Your document is being processed. This panel will update automatically.'}</p></div><div className="detail-actions"><span className={`status-tag status-${metadata.status}`}>{metadata.status === 'completed' ? 'Ready to review' : metadata.status}</span>{metadata.status === 'failed' && <button className="button button-secondary" onClick={() => void retryDocument()} disabled={metadata.job?.permanent_failure}>Try again</button>}{invoice && <><a className="button button-primary" href={`${API_BASE}/api/documents/${metadata.id}/result?view=corrected`} target="_blank" rel="noreferrer">Download reviewed result</a><details className="download-options"><summary>Other downloads</summary><a href={`${API_BASE}/api/documents/${metadata.id}/result?view=original`} target="_blank" rel="noreferrer">Download original JSON</a></details></>}<button type="button" className="button button-quiet" onClick={() => setSelectedId(null)}>Back to list</button></div></div>
             {metadata.status === 'processing' && <div className="progress-note" role="status">{processingEvent ? `${processingEvent.details ?? 'Processing'}${processingEvent.event_data?.completed && processingEvent.event_data?.total ? ` · ${processingEvent.event_data.completed} of ${processingEvent.event_data.total}` : ''}` : 'The worker is processing this document.'} · updated from saved processing history</div>}
-            {metadata.error_details && <div className="finding finding-error">{metadata.error_details}</div>}
+            {metadata.error_details && <div className="finding finding-error processing-issue"><strong>This document needs attention</strong><span>{friendlyProcessingError(metadata.error_details)}</span></div>}
             <div className="review-grid">
-              <div className="card invoice-card"><div className="section-title"><div><p className="eyebrow">EXTRACTED DATA</p><h3>Invoice details</h3></div>{invoice && <span className={`review-tag ${findings.length ? 'needs-review' : 'clear'}`}>{findings.length ? 'Review required' : 'No findings'}</span>}</div>
+              <div className="card invoice-card"><div className="section-title"><div><p className="eyebrow">CHECK THESE DETAILS</p><h3>Invoice details</h3></div>{invoice && <span className={`review-tag ${findings.length ? 'needs-review' : 'clear'}`}>{findings.length ? 'Review required' : 'Looks good'}</span>}</div>
+                <p className="help-text">We filled in what we could read. Correct anything that looks wrong, then choose <strong>Save review</strong>. Leave unknown values blank.</p>
                 {invoice ? <form className="invoice-form" onSubmit={submitCorrection}>
                   <div className="field-grid">
                     <label>Invoice number<input value={edit.invoice_number ?? ''} onChange={(e) => updateInvoiceField('invoice_number', e.target.value)} /></label>
@@ -383,27 +420,29 @@ export default function App() {
                     <td><button type="button" aria-label={`Remove line ${i + 1}`} className="icon-button" onClick={() => { markHumanCorrection(); setLineItems((rows) => rows.filter((_, index) => index !== i)) }}>×</button></td>
                   </tr>)}</tbody></table></div> : <p className="muted">No line items were extracted.</p>}
                   <label>Correction reason<input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Optional: explain the source used" /></label>
-                  <div className="save-row"><small>Saving records the previous value and reruns financial validation.</small><button className="button button-primary" disabled={saving}>{saving ? 'Saving…' : 'Save corrections'}</button></div>
+                  <div className="save-row"><small>Your original file stays unchanged. Saving updates the extracted result and records your changes.</small><button className="button button-primary" disabled={saving}>{saving ? 'Saving…' : 'Save review'}</button></div>
                 </form> : <div className="empty-state">Invoice extraction is not available until processing completes.</div>}
               </div>
               <aside className="side-stack">
-                <div className="card"><p className="eyebrow">QUALITY REVIEW</p><h3>Validation & uncertainty</h3>
+                <div className="card"><p className="eyebrow">CHECK THIS</p><h3>Items to review</h3>
                   {findings.length || invoiceWarnings(invoice).length ? <ul className="finding-list">{[...findings, ...invoiceWarnings(invoice)].map((item, i) => <li key={`${item.code}-${i}`} className={`finding ${item.severity === 'error' ? 'finding-error' : 'finding-warning'}`}><strong>{item.field_name ?? item.field ?? item.code}</strong><span>{item.message}</span>{item.explanation && <small>{item.explanation}</small>}</li>)}</ul> : invoice ? <p className="muted">No stored validation findings.</p> : <p className="muted">Results appear after processing.</p>}
                   {invoice?.field_confidence && <div className="confidence-note">Field quality indicators are heuristic, not calibrated probabilities. {Object.entries(invoice.field_confidence).map(([key, value]) => value !== null && value < 0.7 ? <span className="review-tag needs-review" key={key}>{key.replace(/_/g, ' ')} · low quality</span> : null)}</div>}
                 </div>
-                <div className="card"><p className="eyebrow">OPTIONAL LOCAL MODEL</p><h3>Correction suggestions</h3>
-                  {readiness?.checks.local_ai === 'enabled' ? <button className="button button-secondary" onClick={() => void requestAISuggestions()} disabled={loadingSuggestions}>{loadingSuggestions ? 'Reviewing source…' : 'Suggest corrections with Ollama'}</button> : <p className="muted">Local AI is disabled. Set OLLAMA_ENABLED=true and OLLAMA_MODEL in .env, then restart the API and worker to request suggestions. Manual review and correction remain available.</p>}
+                <details className="card optional-panel"><summary>Optional: AI correction suggestions</summary><p className="help-text">AI suggestions are optional. Review each suggestion and its evidence before saving it.</p>
+                  {readiness?.checks.local_ai === 'enabled' ? <button className="button button-secondary" onClick={() => void requestAISuggestions()} disabled={loadingSuggestions}>{loadingSuggestions ? 'Checking the document…' : 'Ask local AI for suggestions'}</button> : <p className="muted">Local AI is off. You can still review and correct the invoice yourself.</p>}
                   {aiSuggestions && <div className="suggestion-review" aria-label="Model correction suggestions"><p className="model-caption">Model: {aiSuggestions.model}. Suggestions are evidence-grounded proposals and are not saved until you stage and save them.</p>
                     {aiSuggestions.suggestions.length ? <ul className="suggestion-list">{aiSuggestions.suggestions.map((item) => <li key={item.field}><label className="suggestion-select"><input type="checkbox" checked={selectedSuggestions.includes(item.field)} onChange={(event) => setSelectedSuggestions((selected) => event.target.checked ? [...selected, item.field] : selected.filter((field) => field !== item.field))} /><strong>{item.field.replace(/_/g, ' ')}</strong></label><div className="suggestion-values"><span><small>Current</small><code>{readableValue(item.current_value)}</code></span><span><small>Model suggests</small><code>{readableValue(item.suggested_value)}</code></span></div><small>Source evidence</small>{item.evidence.map((snippet, index) => <blockquote key={`${item.field}-${index}`}>{snippet}</blockquote>)}</li>)}</ul> : <p className="muted">The model found no changes it could support from the source.</p>}
                     {aiSuggestions.suggestions.length > 0 && <button type="button" className="button button-primary" disabled={!selectedSuggestions.length} onClick={stageSelectedSuggestions}>Use selected suggestions in form</button>}
                   </div>}
-                </div>
-                <div className="card"><p className="eyebrow">BEFORE & AFTER</p><h3>Extracted and corrected values</h3>
+                </details>
+                <details className="review-more"><summary>More details (optional)</summary>
+                <div className="card"><p className="eyebrow">BEFORE & AFTER</p><h3>What changed</h3>
                   {changedInvoiceFields.length ? <div className="before-after-list">{changedInvoiceFields.map((field) => <div key={field}><strong>{field.replace(/_/g, ' ')}</strong><span><small>Original</small><code>{readableValue(reviewFieldValue(field, true))}</code></span><span><small>Current result</small><code>{readableValue(reviewFieldValue(field, false))}</code></span></div>)}</div> : <p className="muted">No saved corrections yet. Original extraction and current result are the same.</p>}
                 </div>
                 <div className="card"><p className="eyebrow">SOURCE TRACE</p><h3>Evidence snippets</h3>{Object.entries(evidence).length ? <ul className="evidence-list">{Object.entries(evidence).flatMap(([field, refs]) => refs.map((ref, index) => <li key={`${field}-${index}`}><strong>{field.replace(/_/g, ' ')}</strong><blockquote>{ref.snippet || 'No text snippet stored.'}</blockquote><small>{ref.page ? `Page ${ref.page}` : ref.sheet ? `Sheet ${ref.sheet}` : 'Source'}{ref.cell_coordinates?.length ? ` · ${ref.cell_coordinates.join(', ')}` : ''}</small></li>))}</ul> : <p className="muted">No field-level source snippets were stored.</p>}</div>
                 <div className="card"><p className="eyebrow">CORRECTION AUDIT</p><h3>Manual changes</h3>{correctionHistory.length ? <ol className="correction-list">{correctionHistory.map((item) => <li key={item.id}><strong>{item.field_name.replace(/_/g, ' ')}</strong><span><s>{auditValue(item.previous_value)}</s> <b>→</b> {auditValue(item.corrected_value)}</span>{item.reason && <small>{item.reason}</small>}<small>{new Date(item.created_at).toLocaleString()} · {item.corrected_by || 'Reviewer'}</small></li>)}</ol> : <p className="muted">No manual corrections recorded.</p>}</div>
                 <div className="card"><p className="eyebrow">AUDIT TRAIL</p><h3>Processing history</h3>{history.length ? <ol className="history-list">{history.map((event) => <li key={event.id}><span className="history-dot" /><div><strong>{event.event_type.replace(/_/g, ' ')}</strong><small>{new Date(event.created_at).toLocaleString()}</small>{event.details && <p>{event.details}</p>}</div></li>)}</ol> : <p className="muted">No history recorded.</p>}</div>
+                </details>
               </aside>
             </div>
           </>}
