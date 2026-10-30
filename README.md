@@ -2,7 +2,7 @@
 
 A local-first invoice and document processing application. FastAPI accepts multiple uploads into a persistent SQLite queue; a separate worker extracts PDF, image, spreadsheet, and CSV content, extracts invoice fields, and records explainable financial checks. React/Vite provides the local frontend. Core processing uses no paid API, API key, or internet service.
 
-**New to the project?** Follow the step-by-step [Windows setup and run guide](docs/setup-and-run.md) before starting the app. The [short demo script](docs/short-video-script.md) can help with a walkthrough recording. Prompt and AI-use disclosure is in [AI prompts](docs/ai-prompts.md).
+**New to the project?** Follow the step-by-step [Windows setup and run guide](docs/setup-and-run.md) before starting the app. Prompt and AI-use disclosure is in [AI prompts](docs/ai-prompts.md).
 
 ## Requirements
 
@@ -271,7 +271,6 @@ Real Tesseract integration tests run when the executable configured in `.env` is
 
 ## Walkthrough
 
-See [docs/short-video-script.md](docs/short-video-script.md) for a concise recording script with screen actions and spoken narration, or [docs/walkthrough-script.md](docs/walkthrough-script.md) for a detailed six-minute walkthrough with API examples and reset instructions.
 
 ## Local demonstration limits
 
