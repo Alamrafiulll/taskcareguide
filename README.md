@@ -1,12 +1,14 @@
-# Care Guide — Document Intelligence
+# Invoice Insight — Document Intelligence
 
 A local-first invoice and document processing application. FastAPI accepts multiple uploads into a persistent SQLite queue; a separate worker extracts PDF, image, spreadsheet, and CSV content, extracts invoice fields, and records explainable financial checks. React/Vite provides the local frontend. Core processing uses no paid API, API key, or internet service.
+
+**New to the project?** Follow the step-by-step [Windows setup and run guide](docs/setup-and-run.md) before starting the app. The [short demo script](docs/short-video-script.md) can help with a walkthrough recording. Prompt and AI-use disclosure is in [AI prompts](docs/ai-prompts.md).
 
 ## Requirements
 
 - Windows 11, Python 3.10+, Node.js 20+
 - Tesseract OCR executable for scanned PDFs and image OCR (optional for digital PDFs/spreadsheets)
-- Optional: Ollama and a local model for assisted invoice extraction
+- Optional: Ollama local model or Gemini Developer API provider for assisted invoice extraction
 - Optional: sentence-transformers and a downloaded all-MiniLM-L6-v2 model for semantic/hybrid search
 
 Install a 64-bit CPython Windows release from the [official Python downloads](https://www.python.org/downloads/windows/) and enable the Python launcher. The repository was verified with Python 3.10.11. Install Node.js 20 or later from the [official Node.js download page](https://nodejs.org/en/download) (Node 22 LTS is suitable), then open a fresh PowerShell session. Confirm the tools are available:
@@ -64,13 +66,29 @@ ollama run qwen2.5:1.5b "Return JSON with the key ok set to true."
 The Ollama library lists the 1.5B tag at about 986 MB; it is a reasonable starting point for a 6–8 GB GPU, with CPU fallback. Check the model's license and the [current Ollama model listing](https://ollama.com/library/qwen2.5) before use. Ollama runs its local service at `http://localhost:11434` by default. In `.env`, set:
 
 ```dotenv
+AI_PROVIDER=ollama
 OLLAMA_ENABLED=true
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=qwen2.5:1.5b
-OLLAMA_TIMEOUT_SECONDS=20
+OLLAMA_TIMEOUT_SECONDS=60
 ```
 
-Restart both the API and worker after changing `.env`. Keep `OLLAMA_ENABLED=false` and `OLLAMA_MODEL=` to run without Ollama. Runtime model calls remain local; do not configure an Ollama cloud model or cloud endpoint for this zero-budget local assessment.
+Restart both the API and worker after changing `.env`. Set `AI_PROVIDER=none`, `OLLAMA_ENABLED=false`, and `OLLAMA_MODEL=` to run without Ollama. Ollama calls remain local; do not configure an Ollama cloud model or cloud endpoint for this zero-budget local assessment.
+
+### Optional Gemini API provider
+
+Gemini is an optional **cloud** provider; extracted document text is sent to Google's Gemini API only when selected. Create a Gemini API key in [Google AI Studio](https://aistudio.google.com/app/apikey), then put it in the root `.env` file (never in source code, the frontend, or a committed file):
+
+```dotenv
+AI_PROVIDER=gemini
+GEMINI_API_KEY=replace-with-your-new-key
+GEMINI_MODEL=gemini-2.5-flash-lite
+GEMINI_TIMEOUT_SECONDS=30
+```
+
+Restart the API and worker. The key is sent in an HTTPS request header and is not logged or returned by the API. Leave `AI_PROVIDER=none` for deterministic-only extraction. Use `AI_PROVIDER=ollama` with `OLLAMA_ENABLED=true` and `OLLAMA_MODEL` for local inference; Ollama takes no Gemini key. If Gemini and Ollama are both configured, `AI_PROVIDER` selects exactly one provider.
+
+Google's free tier has model-specific quotas and its terms say content submitted on unpaid quota may be used to improve Google services and may be reviewed. **Use synthetic assessment invoices only with the free tier; do not send real, sensitive or confidential business documents.** See Google's [current pricing](https://ai.google.dev/gemini-api/docs/pricing) and [Gemini API terms](https://ai.google.dev/gemini-api/terms). The cloud option changes the assessment's original local-only/no-API-key constraint.
 
 ### Optional local semantic search
 
@@ -118,9 +136,12 @@ All assessment endpoints are under `/api`.
 
 - `POST /api/documents/upload` — multipart `files` upload; responds `202` with per-file accepted/rejected/duplicate statuses and IDs.
 - `GET /api/documents` — paginated listing with invoice, supplier, customer, currency, date, processing, validation, and keyword filters.
-- `GET /api/documents/{id}`, `/status`, `/history`, `/validation-errors`, `/invoice`, `/result` — stored metadata, status, audit history, checks, invoice JSON, or generated JSON download.
+- `GET /api/documents/{id}`, `/status`, `/history`, `/validation-errors`, `/invoice`, `/result` — stored metadata, status, audit history, checks, invoice JSON, or JSON download.
+- `GET /api/documents/{id}/source` — download the original uploaded file in its original format.
+- `GET /api/documents/{id}/invoice.pdf` — generate a new PDF from the current saved invoice fields, line items, and validation findings. This is a reviewed summary PDF; it does not edit the original upload.
+- `DELETE /api/documents/{id}` — remove a queued/completed/failed document, its database records, and local source/processed files. Active processing is refused with `409`.
 - `PUT /api/documents/{id}/invoice` — correct invoice fields and line items with optional reason; stores the original extraction, validates the updated record, and appends correction audit rows.
-- `POST /api/documents/{id}/invoice/ai-suggestions` — when local Ollama is enabled, returns schema-validated, source-grounded proposals only for fields flagged for review. It never applies them. The reviewer selects proposals in the UI and explicitly saves them through the correction endpoint; the audit records the local model and acceptance.
+- `POST /api/documents/{id}/invoice/ai-suggestions` — when Ollama or Gemini is selected and configured, returns schema-validated, source-grounded proposals only for fields flagged for review. It never applies them. The reviewer selects proposals in the UI and explicitly saves them through the correction endpoint; the audit records provider/model and acceptance.
 - `GET /api/documents?correction_status=needs_review|ai_corrected|human_corrected|not_needed` — persisted views for documents needing attention and documents whose local-model suggestions a reviewer accepted.
 - `GET /api/documents/{id}/result?view=original|corrected` — download the untouched extracted result or a JSON view assembled from the current corrected database result and correction audit.
 - `POST /api/documents/{id}/retry` — requeues eligible failed jobs; permanently invalid sources and exhausted retry limits are rejected.
@@ -131,13 +152,13 @@ API errors use an `error` object with a stable code and safe message. Upload lim
 
 ## Extraction, review, and validation
 
-PDF pages are extracted incrementally with PyMuPDF; pages with little selectable text go to Pillow preprocessing and Tesseract OCR. Image OCR, all workbook sheets, legacy XLS and safe CSV parsing preserve source context. A per-file failure does not interrupt other files in a batch. The invoice extractor uses document text/tables and deterministic patterns, with optional local Ollama assistance. Prompts, schema checks, bounded retries, evidence grounding, and the difference between AI-assisted development and runtime AI are described in [docs/ai-prompts.md](docs/ai-prompts.md).
+PDF pages are extracted incrementally with PyMuPDF; pages with little selectable text go to Pillow preprocessing and Tesseract OCR. Image OCR, all workbook sheets, legacy XLS and safe CSV parsing preserve source context. A per-file failure does not interrupt other files in a batch. The invoice extractor uses document text/tables and deterministic patterns, with optional Ollama or Gemini assistance. Prompts, schema checks, bounded retries, evidence grounding, and the difference between AI-assisted development and runtime AI are described in [docs/ai-prompts.md](docs/ai-prompts.md).
 
 Invoice financial values use `Decimal`; `INVOICE_ROUNDING_TOLERANCE` defaults to an absolute `0.02`. Rules do not assume a tax system. Confidence values are heuristic quality indicators, not calibrated probabilities. Missing, conflicting, or low quality fields are surfaced for review. Duplicate invoice checks normalize the supplier and invoice number; identical totals alone do not trigger a match. See [docs/architecture.md](docs/architecture.md) and [docs/database-schema.md](docs/database-schema.md).
 
 ## Frontend workflow
 
-The React workspace is a real API client. It supports multi-file upload with per-file feedback, paginated/filterable queue review, stored invoice/evidence/validation/history details, manual invoice and line-item corrections, optional evidence-grounded Ollama suggestions with reviewer approval, before/after comparison, original/corrected JSON downloads, eligible failed-job retries, metadata-only keyword/semantic/hybrid search, and comparison of two selected completed documents. Its Needs correction and AI corrected views are backed by persisted validation and correction history. It polls saved document/history state for updates and does not display invented progress percentages. Semantic and hybrid search need the optional local embedding model; model correction suggestions need Ollama; the rest of the frontend remains available without either. Vitest and Testing Library exercise upload, API error feedback, invoice review, and file-type validation.
+The React workspace is a real API client. It supports multi-file upload with per-file feedback, paginated/filterable queue review, stored invoice/evidence/validation/history details, manual invoice and line-item corrections, optional evidence-grounded Ollama or Gemini suggestions with reviewer approval, comparison directly on the Documents page, original-format source downloads, reviewed-summary PDF downloads, JSON exports, confirmed document removal, eligible failed-job retries, and metadata-only keyword/semantic/hybrid search. Its Needs correction and AI corrected views are backed by persisted validation and correction history. It polls saved document/history state for updates and does not display invented progress percentages. Semantic and hybrid search need the optional local embedding model; model correction suggestions need one configured AI provider; the rest of the frontend remains available without either. Vitest and Testing Library exercise upload, API error feedback, invoice review, comparison, downloads, removal, and file-type validation.
 
 ## API request examples (PowerShell)
 
@@ -183,7 +204,7 @@ Invoke-RestMethod -Method Put -Uri "http://127.0.0.1:8000/api/documents/$documen
 Invoke-RestMethod "http://127.0.0.1:8000/api/documents/$documentId/invoice/corrections" | ConvertTo-Json -Depth 8
 ```
 
-Optional local Ollama review returns suggestions without changing the saved invoice. The frontend displays each proposal with its source snippet; stage selected values in the form and explicitly save them to record accepted corrections.
+Optional Ollama or Gemini review returns suggestions without changing the saved invoice. The frontend displays each proposal with its source snippet; stage selected values in the form and explicitly save them to record accepted corrections.
 
 ```powershell
 Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/api/documents/$documentId/invoice/ai-suggestions" | ConvertTo-Json -Depth 10
@@ -232,7 +253,7 @@ python scripts\evaluate.py
 python scripts\evaluate.py --benchmark-pages 1000
 ```
 
-Each run saves a timestamped JSON file in `evaluation/results/`. The committed report [evaluation-20261028T203950Z.json](evaluation/results/evaluation-20261028T203950Z.json) was generated in this workspace. It records 54/54 exact matches (1.0) across fields with available local dependencies, 8/8 expected validation/duplicate checks, 9/10 successful processing outcomes (the tenth is the deliberately corrupt PDF), and one expected file failure. Tesseract is unavailable in this environment; the three OCR-dependent fixtures are explicitly listed as dependency-skipped and do not inflate those field or validation denominators. This is not an OCR accuracy result. The optional 1,000-page local digital-text PDF benchmark reported 1,000 pages processed in 0.0852 seconds in that run; this timing is machine-specific and is neither an OCR benchmark nor a concurrency claim. Inspect the report for detailed per-field/case results.
+Each run saves a timestamped JSON file in `evaluation/results/`. The latest recorded run, [evaluation-20261030T194423Z.json](evaluation/results/evaluation-20261030T194423Z.json), used configured Tesseract 5.5.3 and processed all 10 documents, including scanned PDF and image paths. It measured 77/80 exact field matches (96.25%); invoice number, date, supplier/customer, subtotal, tax, total, and currency matched all labeled eligible cases, while line-item matches were 6/9 because OCR misread three descriptions. The pipeline completed 9/10 jobs; the corrupt PDF was the expected failure. All 10 expected validation and duplicate checks passed. The same run processed a 1,000-page digital-text PDF in 0.0776 seconds. These are small synthetic, machine-specific measurements, not production accuracy, OCR generalization, an SLA, or a concurrency claim. See the report for per-case outcomes and timings.
 
 The dataset contains synthetic ground-truth labels for digital PDF and XLSX invoices, CSV extraction/validation cases, a deliberate duplicate, an uncertain invoice identifier, a scanned JPG/PDF pair, and a corrupted PDF. `ground_truth.json` documents null, unreadable, dependency-skip, and expected-validation handling. No real customer or vendor data is included.
 
@@ -246,11 +267,11 @@ npm.cmd run build
 Set-Location ..
 ```
 
-The real Tesseract integration test is skipped only when the configured local executable is unavailable; install it and rerun to measure OCR. The local model integration test for semantic search is similarly conditional on model dependencies/weights. The long PDF measurement is opt-in so regular tests stay quick.
+Real Tesseract integration tests run when the executable configured in `.env` is available; in the latest test run they all ran. Semantic-search tests validate cosine ranking and vector persistence with deterministic embeddings, but the real downloaded sentence-transformers model path was not exercised in that run. The 1,000-page benchmark is opt-in so regular tests stay quick.
 
 ## Walkthrough
 
-See [docs/walkthrough-script.md](docs/walkthrough-script.md) for a chronological six-minute assessment demo, example API calls, manual correction review, comparison, failure handling, evaluation, and reset steps.
+See [docs/short-video-script.md](docs/short-video-script.md) for a concise recording script with screen actions and spoken narration, or [docs/walkthrough-script.md](docs/walkthrough-script.md) for a detailed six-minute walkthrough with API examples and reset instructions.
 
 ## Local demonstration limits
 

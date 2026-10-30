@@ -1,0 +1,2379 @@
+{
+  "report_version": 1,
+  "generated_at_utc": "2026-10-30T19:44:23.222450+00:00",
+  "dataset": {
+    "name": "Care Guide synthetic invoices v1",
+    "size": 10,
+    "path": "evaluation/dataset",
+    "ground_truth": "evaluation/dataset/ground_truth.json"
+  },
+  "environment": {
+    "python": "3.10.11",
+    "platform": "Windows-10-10.0.26200-SP0",
+    "pymupdf": "1.25.5",
+    "pillow": "11.1.0",
+    "openpyxl": "3.1.5",
+    "tesseract": "5.5.3.20260724",
+    "ollama_runtime_enabled": false,
+    "sentence_transformers_installed": true
+  },
+  "methodology": {
+    "field_accuracy": "Exact match after documented normalization. Explicit null labels count in the denominator and match only a null extraction. unreadable_fields and skipped_fields are excluded from field accuracy and separately identified by the manifest. Processing failures remain in the denominator unless fields are explicitly skipped.",
+    "processing_success": "Stored worker document status completed and processor status completed or completed_with_errors. A captured OCR page error still counts as a completed document pipeline, but its missing invoice fields count as extraction misses.",
+    "failure_rate": "Failed or not-queued documents divided by all manifest documents.",
+    "timing": "Worker started_at to completed_at in the isolated SQLite run; PDF page time divides by pages actually processed. Includes extraction persistence pipeline duration as recorded by job timestamps.",
+    "validation": "Known validation codes must appear in persisted structured validation findings. Duplicate checks compare normalized supplier plus invoice identifier; equal amount alone is not considered a duplicate."
+  },
+  "metrics": {
+    "field_exact_match_accuracy": {
+      "exact_matches": 77,
+      "denominator": 80,
+      "accuracy": 0.9625
+    },
+    "per_field": {
+      "invoice_number": {
+        "exact_matches": 8,
+        "denominator": 8,
+        "accuracy": 1.0,
+        "mismatches": []
+      },
+      "invoice_date": {
+        "exact_matches": 9,
+        "denominator": 9,
+        "accuracy": 1.0,
+        "mismatches": []
+      },
+      "supplier_name": {
+        "exact_matches": 9,
+        "denominator": 9,
+        "accuracy": 1.0,
+        "mismatches": []
+      },
+      "customer_name": {
+        "exact_matches": 9,
+        "denominator": 9,
+        "accuracy": 1.0,
+        "mismatches": []
+      },
+      "subtotal": {
+        "exact_matches": 9,
+        "denominator": 9,
+        "accuracy": 1.0,
+        "mismatches": []
+      },
+      "tax_amount": {
+        "exact_matches": 9,
+        "denominator": 9,
+        "accuracy": 1.0,
+        "mismatches": []
+      },
+      "total_amount": {
+        "exact_matches": 9,
+        "denominator": 9,
+        "accuracy": 1.0,
+        "mismatches": []
+      },
+      "currency": {
+        "exact_matches": 9,
+        "denominator": 9,
+        "accuracy": 1.0,
+        "mismatches": []
+      },
+      "line_items": {
+        "exact_matches": 6,
+        "denominator": 9,
+        "accuracy": 0.6666666666666666,
+        "mismatches": [
+          {
+            "file": "uncertain_invoice.png",
+            "expected": [
+              {
+                "description": "Care visit",
+                "quantity": "2",
+                "unit_price": "50.00",
+                "line_total": "100.00"
+              },
+              {
+                "description": "Diagnostic kit",
+                "quantity": "1",
+                "unit_price": "0.00",
+                "line_total": "0.00"
+              }
+            ],
+            "observed": [
+              {
+                "description": "Diagnostic visit",
+                "quantity": "2",
+                "unit_price": "50.00",
+                "line_total": "100.00",
+                "source_page": 1,
+                "source_sheet": null,
+                "source_snippet": "Diagnostic visit | 2 | 50.00 | 100.00"
+              },
+              {
+                "description": "Diagnostic kit",
+                "quantity": "1",
+                "unit_price": "0.00",
+                "line_total": "0.00",
+                "source_page": 1,
+                "source_sheet": null,
+                "source_snippet": "Diagnostic kit | 1 | 0.00 | 0.00"
+              }
+            ]
+          },
+          {
+            "file": "scanned_invoice.jpg",
+            "expected": [
+              {
+                "description": "Care visit",
+                "quantity": "2",
+                "unit_price": "50.00",
+                "line_total": "100.00"
+              },
+              {
+                "description": "Diagnostic kit",
+                "quantity": "1",
+                "unit_price": "0.00",
+                "line_total": "0.00"
+              }
+            ],
+            "observed": [
+              {
+                "description": "Scanned consultation",
+                "quantity": "2",
+                "unit_price": "50.00",
+                "line_total": "100.00",
+                "source_page": 1,
+                "source_sheet": null,
+                "source_snippet": "Scanned consultation | 2 | 50.00 | 100.00"
+              },
+              {
+                "description": "Diagnostic kit",
+                "quantity": "1",
+                "unit_price": "0.00",
+                "line_total": "0.00",
+                "source_page": 1,
+                "source_sheet": null,
+                "source_snippet": "Diagnostic kit | 1 | 0.00 | 0.00"
+              }
+            ]
+          },
+          {
+            "file": "scanned_invoice.pdf",
+            "expected": [
+              {
+                "description": "Care visit",
+                "quantity": "2",
+                "unit_price": "50.00",
+                "line_total": "100.00"
+              },
+              {
+                "description": "Diagnostic kit",
+                "quantity": "1",
+                "unit_price": "0.00",
+                "line_total": "0.00"
+              }
+            ],
+            "observed": [
+              {
+                "description": "Scanned consultation",
+                "quantity": "2",
+                "unit_price": "50.00",
+                "line_total": "100.00",
+                "source_page": 1,
+                "source_sheet": null,
+                "source_snippet": "Scanned consultation | 2 | 50.00 | 100.00"
+              },
+              {
+                "description": "Diagnostic kit",
+                "quantity": "1",
+                "unit_price": "0.00",
+                "line_total": "0.00",
+                "source_page": 1,
+                "source_sheet": null,
+                "source_snippet": "Diagnostic kit | 1 | 0.00 | 0.00"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "document_processing_success": {
+      "count": 9,
+      "denominator": 10,
+      "rate": 0.9
+    },
+    "document_failure": {
+      "count": 1,
+      "denominator": 10,
+      "rate": 0.1,
+      "expected_failures": 1
+    },
+    "processing_time_seconds": {
+      "measured_documents": 10,
+      "mean": 0.1235192,
+      "median": 0.039382,
+      "per_document": {
+        "valid_invoice.pdf": 0.064137,
+        "spreadsheet_valid.xlsx": 0.212419,
+        "missing_invoice_number.csv": 0.008528,
+        "missing_tax.csv": 0.006969,
+        "incorrect_total.pdf": 0.008553,
+        "duplicate_invoice.csv": 0.006207,
+        "uncertain_invoice.png": 0.277051,
+        "scanned_invoice.jpg": 0.265359,
+        "scanned_invoice.pdf": 0.371342,
+        "corrupted.pdf": 0.014627
+      }
+    },
+    "pdf_seconds_per_processed_page_mean": 0.14801066666666668,
+    "validation_expected_checks": {
+      "passed": 10,
+      "denominator": 10,
+      "rate": 1.0
+    },
+    "known_inconsistent_invoice_outcomes": [
+      {
+        "file": "incorrect_total.pdf",
+        "expected_mismatch": "subtotal_tax_total_mismatch",
+        "detected": true,
+        "actual_codes": [
+          "subtotal_tax_total_mismatch"
+        ]
+      }
+    ],
+    "ocr_cases": [
+      {
+        "file": "valid_invoice.pdf",
+        "ocr_used": false,
+        "processing_errors": []
+      },
+      {
+        "file": "incorrect_total.pdf",
+        "ocr_used": false,
+        "processing_errors": []
+      },
+      {
+        "file": "uncertain_invoice.png",
+        "ocr_used": true,
+        "processing_errors": []
+      },
+      {
+        "file": "scanned_invoice.jpg",
+        "ocr_used": true,
+        "processing_errors": []
+      },
+      {
+        "file": "scanned_invoice.pdf",
+        "ocr_used": true,
+        "processing_errors": []
+      }
+    ]
+  },
+  "validation_checks": [
+    {
+      "file": "valid_invoice.pdf",
+      "expected_codes": [],
+      "actual_codes": [],
+      "missing_expected_codes": [],
+      "expected_codes_present": true
+    },
+    {
+      "file": "spreadsheet_valid.xlsx",
+      "expected_codes": [
+        "duplicate_invoice"
+      ],
+      "actual_codes": [
+        "duplicate_invoice"
+      ],
+      "missing_expected_codes": [],
+      "expected_codes_present": true,
+      "expected_duplicate_of": "valid_invoice.pdf",
+      "duplicate_detected": true
+    },
+    {
+      "file": "missing_invoice_number.csv",
+      "expected_codes": [
+        "field_uncertain",
+        "required_field_missing"
+      ],
+      "actual_codes": [
+        "field_uncertain",
+        "required_field_missing"
+      ],
+      "missing_expected_codes": [],
+      "expected_codes_present": true
+    },
+    {
+      "file": "missing_tax.csv",
+      "expected_codes": [
+        "field_missing"
+      ],
+      "actual_codes": [
+        "field_missing"
+      ],
+      "missing_expected_codes": [],
+      "expected_codes_present": true
+    },
+    {
+      "file": "incorrect_total.pdf",
+      "expected_codes": [
+        "subtotal_tax_total_mismatch"
+      ],
+      "actual_codes": [
+        "subtotal_tax_total_mismatch"
+      ],
+      "missing_expected_codes": [],
+      "expected_codes_present": true
+    },
+    {
+      "file": "duplicate_invoice.csv",
+      "expected_codes": [
+        "duplicate_invoice"
+      ],
+      "actual_codes": [
+        "duplicate_invoice"
+      ],
+      "missing_expected_codes": [],
+      "expected_codes_present": true,
+      "expected_duplicate_of": "valid_invoice.pdf",
+      "duplicate_detected": true
+    },
+    {
+      "file": "uncertain_invoice.png",
+      "expected_codes": [
+        "field_uncertain",
+        "required_field_missing"
+      ],
+      "actual_codes": [
+        "field_low_quality",
+        "field_uncertain",
+        "ocr_source",
+        "required_field_missing"
+      ],
+      "missing_expected_codes": [],
+      "expected_codes_present": true
+    },
+    {
+      "file": "scanned_invoice.jpg",
+      "expected_codes": [],
+      "actual_codes": [
+        "field_low_quality",
+        "ocr_source"
+      ],
+      "missing_expected_codes": [],
+      "expected_codes_present": true
+    },
+    {
+      "file": "scanned_invoice.pdf",
+      "expected_codes": [],
+      "actual_codes": [
+        "duplicate_invoice",
+        "field_low_quality",
+        "ocr_source"
+      ],
+      "missing_expected_codes": [],
+      "expected_codes_present": true
+    },
+    {
+      "file": "corrupted.pdf",
+      "expected_codes": [],
+      "actual_codes": [],
+      "missing_expected_codes": [],
+      "expected_codes_present": true
+    }
+  ],
+  "dependency_skips": {
+    "ocr_required_documents": []
+  },
+  "documents": [
+    {
+      "file": "valid_invoice.pdf",
+      "document_id": 1,
+      "worker_status": "completed",
+      "job_status": "completed",
+      "error": null,
+      "status": "completed",
+      "invoice": {
+        "invoice_number": "CG-EVAL-1001",
+        "invoice_date": "2026-05-10",
+        "supplier_name": "North Clinic",
+        "customer_name": "Care Guide",
+        "subtotal": "100.00",
+        "tax_amount": "10.00",
+        "total_amount": "110.00",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Care visit",
+            "quantity": "2",
+            "unit_price": "50.00",
+            "line_total": "100.00",
+            "source_page": 1,
+            "source_sheet": null,
+            "source_snippet": "Care visit | 2 | 50.00 | 100.00"
+          },
+          {
+            "description": "Diagnostic kit",
+            "quantity": "1",
+            "unit_price": "0.00",
+            "line_total": "0.00",
+            "source_page": 1,
+            "source_sheet": null,
+            "source_snippet": "Diagnostic kit | 1 | 0.00 | 0.00"
+          }
+        ],
+        "extraction_method": "deterministic",
+        "field_status": {
+          "invoice_number": "present",
+          "invoice_date": "present",
+          "supplier_name": "present",
+          "customer_name": "present",
+          "subtotal": "present",
+          "tax_amount": "present",
+          "total_amount": "present",
+          "currency": "present",
+          "line_items": "present"
+        },
+        "field_confidence": {
+          "invoice_number": 0.9,
+          "invoice_date": 0.9,
+          "supplier_name": 0.9,
+          "customer_name": 0.9,
+          "subtotal": 0.9,
+          "tax_amount": 0.9,
+          "total_amount": 0.9,
+          "currency": 0.9,
+          "line_items": 0.9
+        },
+        "field_evidence": {
+          "invoice_number": [
+            {
+              "snippet": "Invoice Number: CG-EVAL-1001",
+              "page": 1
+            }
+          ],
+          "invoice_date": [
+            {
+              "snippet": "Invoice Date: 2026-05-10",
+              "page": 1
+            }
+          ],
+          "supplier_name": [
+            {
+              "snippet": "Supplier: North Clinic",
+              "page": 1
+            }
+          ],
+          "customer_name": [
+            {
+              "snippet": "Customer: Care Guide",
+              "page": 1
+            }
+          ],
+          "subtotal": [
+            {
+              "snippet": "Subtotal: 100.00",
+              "page": 1
+            }
+          ],
+          "tax_amount": [
+            {
+              "snippet": "Tax: 10.00",
+              "page": 1
+            }
+          ],
+          "total_amount": [
+            {
+              "snippet": "Total: 110.00",
+              "page": 1
+            }
+          ],
+          "currency": [
+            {
+              "snippet": "Invoice Number: CG-EVAL-1001\nInvoice Date: 2026-05-10\nSupplier: North Clinic\nCustomer: Care Guide\nCurrency: USD\nSubtotal: 100.00\nTax: 10.00\nTotal: 110.00\nDescription | Quantity | Unit Price | Line Total\nCare visit | 2 | 50.00 | 100.00\nDiagnostic kit | 1 | 0.00 | 0.00",
+              "page": 1
+            }
+          ],
+          "line_items": [
+            {
+              "snippet": "Care visit | 2 | 50.00 | 100.00",
+              "page": 1
+            },
+            {
+              "snippet": "Diagnostic kit | 1 | 0.00 | 0.00",
+              "page": 1
+            }
+          ]
+        },
+        "field_candidates": {
+          "invoice_number": [
+            "CG-EVAL-1001"
+          ],
+          "invoice_date": [
+            "2026-05-10"
+          ],
+          "supplier_name": [
+            "North Clinic"
+          ],
+          "customer_name": [
+            "Care Guide"
+          ],
+          "subtotal": [
+            "100.00"
+          ],
+          "tax_amount": [
+            "10.00"
+          ],
+          "total_amount": [
+            "110.00"
+          ],
+          "currency": [
+            "USD"
+          ]
+        },
+        "field_confidence_note": "Heuristic source-quality scores only; not statistically calibrated probabilities.",
+        "warnings": [],
+        "extraction_metadata": {
+          "ai_provider": null,
+          "ai_model": null,
+          "ai_enabled": false,
+          "ai_retry_limit": 0
+        }
+      },
+      "validation_codes": [],
+      "ocr_used": false,
+      "warnings": [],
+      "processing_errors": [],
+      "page_count": 1,
+      "pages_processed": 1,
+      "duration_seconds": 0.064137,
+      "duplicate_document_ids": []
+    },
+    {
+      "file": "spreadsheet_valid.xlsx",
+      "document_id": 2,
+      "worker_status": "completed",
+      "job_status": "completed",
+      "error": null,
+      "status": "completed",
+      "invoice": {
+        "invoice_number": "CG-EVAL-1001",
+        "invoice_date": "2026-05-10",
+        "supplier_name": "North Clinic",
+        "customer_name": "Care Guide",
+        "subtotal": "100.00",
+        "tax_amount": "10.00",
+        "total_amount": "110.00",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Care visit",
+            "quantity": "2",
+            "unit_price": "50.00",
+            "line_total": "100.00",
+            "source_page": null,
+            "source_sheet": "Invoice",
+            "source_snippet": "Care visit | 2 | 50.00 | 100.00"
+          },
+          {
+            "description": "Diagnostic kit",
+            "quantity": "1",
+            "unit_price": "0.00",
+            "line_total": "0.00",
+            "source_page": null,
+            "source_sheet": "Invoice",
+            "source_snippet": "Diagnostic kit | 1 | 0.00 | 0.00"
+          }
+        ],
+        "extraction_method": "deterministic",
+        "field_status": {
+          "invoice_number": "present",
+          "invoice_date": "present",
+          "supplier_name": "present",
+          "customer_name": "present",
+          "subtotal": "present",
+          "tax_amount": "present",
+          "total_amount": "present",
+          "currency": "present",
+          "line_items": "present"
+        },
+        "field_confidence": {
+          "invoice_number": 0.9,
+          "invoice_date": 0.9,
+          "supplier_name": 0.9,
+          "customer_name": 0.9,
+          "subtotal": 0.9,
+          "tax_amount": 0.9,
+          "total_amount": 0.9,
+          "currency": 0.9,
+          "line_items": 0.9
+        },
+        "field_evidence": {
+          "invoice_number": [
+            {
+              "snippet": "Invoice Number: CG-EVAL-1001",
+              "sheet": "Invoice",
+              "cell_coordinates": [
+                "A3",
+                "B3"
+              ]
+            }
+          ],
+          "invoice_date": [
+            {
+              "snippet": "Invoice Date: 2026-05-10",
+              "sheet": "Invoice",
+              "cell_coordinates": [
+                "A4",
+                "B4"
+              ]
+            }
+          ],
+          "supplier_name": [
+            {
+              "snippet": "Supplier: North Clinic",
+              "sheet": "Invoice",
+              "cell_coordinates": [
+                "A1",
+                "B1"
+              ]
+            }
+          ],
+          "customer_name": [
+            {
+              "snippet": "Customer: Care Guide",
+              "sheet": "Invoice",
+              "cell_coordinates": [
+                "A2",
+                "B2"
+              ]
+            }
+          ],
+          "subtotal": [
+            {
+              "snippet": "Subtotal: 100.00",
+              "sheet": "Invoice",
+              "cell_coordinates": [
+                "A6",
+                "B6"
+              ]
+            }
+          ],
+          "tax_amount": [
+            {
+              "snippet": "Tax: 10.00",
+              "sheet": "Invoice",
+              "cell_coordinates": [
+                "A7",
+                "B7"
+              ]
+            }
+          ],
+          "total_amount": [
+            {
+              "snippet": "Total: 110.00",
+              "sheet": "Invoice",
+              "cell_coordinates": [
+                "A8",
+                "B8"
+              ]
+            }
+          ],
+          "currency": [
+            {
+              "snippet": "A1: Supplier\nB1: North Clinic\nA2: Customer\nB2: Care Guide\nA3: Invoice Number\nB3: CG-EVAL-1001\nA4: Invoice Date\nB4: 2026-05-10\nA5: Currency\nB5: USD\nA6: Subtotal\nB6: 100.00\nA7: Tax\nB7: 10.00\nA8: Total\nB8: 110.00\nA10: Description\nB10: Quantity\nC10: Unit Price\nD10: Line Total\nA11: Care visit\nB11: 2\nC11: 50.00\nD11: 100.00\nA12: Diagnostic kit\nB12: 1\nC12: 0.00\nD12: 0.00",
+              "sheet": "Invoice"
+            }
+          ],
+          "line_items": [
+            {
+              "snippet": "Care visit | 2 | 50.00 | 100.00",
+              "sheet": "Invoice"
+            },
+            {
+              "snippet": "Diagnostic kit | 1 | 0.00 | 0.00",
+              "sheet": "Invoice"
+            }
+          ]
+        },
+        "field_candidates": {
+          "invoice_number": [
+            "CG-EVAL-1001"
+          ],
+          "invoice_date": [
+            "2026-05-10"
+          ],
+          "supplier_name": [
+            "North Clinic"
+          ],
+          "customer_name": [
+            "Care Guide"
+          ],
+          "subtotal": [
+            "100.00"
+          ],
+          "tax_amount": [
+            "10.00"
+          ],
+          "total_amount": [
+            "110.00"
+          ],
+          "currency": [
+            "USD"
+          ]
+        },
+        "field_confidence_note": "Heuristic source-quality scores only; not statistically calibrated probabilities.",
+        "warnings": [],
+        "extraction_metadata": {
+          "ai_provider": null,
+          "ai_model": null,
+          "ai_enabled": false,
+          "ai_retry_limit": 0
+        }
+      },
+      "validation_codes": [
+        "duplicate_invoice"
+      ],
+      "ocr_used": false,
+      "warnings": [],
+      "processing_errors": [],
+      "page_count": null,
+      "pages_processed": 0,
+      "duration_seconds": 0.212419,
+      "duplicate_document_ids": [
+        1
+      ]
+    },
+    {
+      "file": "missing_invoice_number.csv",
+      "document_id": 3,
+      "worker_status": "completed",
+      "job_status": "completed",
+      "error": null,
+      "status": "completed",
+      "invoice": {
+        "invoice_number": null,
+        "invoice_date": "2026-05-10",
+        "supplier_name": "North Clinic",
+        "customer_name": "Care Guide",
+        "subtotal": "100.00",
+        "tax_amount": "10.00",
+        "total_amount": "110.00",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Care visit",
+            "quantity": "2",
+            "unit_price": "50.00",
+            "line_total": "100.00",
+            "source_page": null,
+            "source_sheet": "CSV",
+            "source_snippet": "Care visit | 2 | 50.00 | 100.00"
+          },
+          {
+            "description": "Diagnostic kit",
+            "quantity": "1",
+            "unit_price": "0.00",
+            "line_total": "0.00",
+            "source_page": null,
+            "source_sheet": "CSV",
+            "source_snippet": "Diagnostic kit | 1 | 0.00 | 0.00"
+          }
+        ],
+        "extraction_method": "deterministic",
+        "field_status": {
+          "invoice_number": "uncertain",
+          "invoice_date": "present",
+          "supplier_name": "present",
+          "customer_name": "present",
+          "subtotal": "present",
+          "tax_amount": "present",
+          "total_amount": "present",
+          "currency": "present",
+          "line_items": "present"
+        },
+        "field_confidence": {
+          "invoice_number": null,
+          "invoice_date": 0.9,
+          "supplier_name": 0.9,
+          "customer_name": 0.9,
+          "subtotal": 0.9,
+          "tax_amount": 0.9,
+          "total_amount": 0.9,
+          "currency": 0.9,
+          "line_items": 0.9
+        },
+        "field_evidence": {
+          "invoice_number": [],
+          "invoice_date": [
+            {
+              "snippet": "Invoice Date: 2026-05-10",
+              "sheet": "CSV",
+              "cell_coordinates": [
+                "A2",
+                "B2"
+              ]
+            }
+          ],
+          "supplier_name": [
+            {
+              "snippet": "Supplier: North Clinic",
+              "sheet": "CSV",
+              "cell_coordinates": [
+                "A3",
+                "B3"
+              ]
+            }
+          ],
+          "customer_name": [
+            {
+              "snippet": "Customer: Care Guide",
+              "sheet": "CSV",
+              "cell_coordinates": [
+                "A4",
+                "B4"
+              ]
+            }
+          ],
+          "subtotal": [
+            {
+              "snippet": "Subtotal: 100.00",
+              "sheet": "CSV",
+              "cell_coordinates": [
+                "A6",
+                "B6"
+              ]
+            }
+          ],
+          "tax_amount": [
+            {
+              "snippet": "Tax: 10.00",
+              "sheet": "CSV",
+              "cell_coordinates": [
+                "A7",
+                "B7"
+              ]
+            }
+          ],
+          "total_amount": [
+            {
+              "snippet": "Total: 110.00",
+              "sheet": "CSV",
+              "cell_coordinates": [
+                "A8",
+                "B8"
+              ]
+            }
+          ],
+          "currency": [
+            {
+              "snippet": "A1: Invoice Number\nB1: unreadable\nA2: Invoice Date\nB2: 2026-05-10\nA3: Supplier\nB3: North Clinic\nA4: Customer\nB4: Care Guide\nA5: Currency\nB5: USD\nA6: Subtotal\nB6: 100.00\nA7: Tax\nB7: 10.00\nA8: Total\nB8: 110.00\nA10: Description\nB10: Quantity\nC10: Unit Price\nD10: Line Total\nA11: Care visit\nB11: 2\nC11: 50.00\nD11: 100.00\nA12: Diagnostic kit\nB12: 1\nC12: 0.00\nD12: 0.00",
+              "sheet": "CSV"
+            }
+          ],
+          "line_items": [
+            {
+              "snippet": "Care visit | 2 | 50.00 | 100.00",
+              "sheet": "CSV"
+            },
+            {
+              "snippet": "Diagnostic kit | 1 | 0.00 | 0.00",
+              "sheet": "CSV"
+            }
+          ]
+        },
+        "field_candidates": {
+          "invoice_date": [
+            "2026-05-10"
+          ],
+          "supplier_name": [
+            "North Clinic"
+          ],
+          "customer_name": [
+            "Care Guide"
+          ],
+          "subtotal": [
+            "100.00"
+          ],
+          "tax_amount": [
+            "10.00"
+          ],
+          "total_amount": [
+            "110.00"
+          ],
+          "currency": [
+            "USD"
+          ]
+        },
+        "field_confidence_note": "Heuristic source-quality scores only; not statistically calibrated probabilities.",
+        "warnings": [
+          {
+            "code": "field_uncertain",
+            "field": "invoice_number",
+            "message": "Source marks invoice number as unreadable or uncertain; no value was invented."
+          }
+        ],
+        "extraction_metadata": {
+          "ai_provider": null,
+          "ai_model": null,
+          "ai_enabled": false,
+          "ai_retry_limit": 0
+        }
+      },
+      "validation_codes": [
+        "field_uncertain",
+        "required_field_missing"
+      ],
+      "ocr_used": false,
+      "warnings": [
+        {
+          "code": "csv_dialect_defaulted",
+          "message": "Could not infer delimiter; treated as comma separated."
+        },
+        {
+          "code": "inconsistent_column_count",
+          "row": 10,
+          "expected": 2,
+          "actual": 4
+        },
+        {
+          "code": "inconsistent_column_count",
+          "row": 11,
+          "expected": 2,
+          "actual": 4
+        },
+        {
+          "code": "inconsistent_column_count",
+          "row": 12,
+          "expected": 2,
+          "actual": 4
+        },
+        {
+          "code": "field_uncertain",
+          "field": "invoice_number",
+          "message": "Source marks invoice number as unreadable or uncertain; no value was invented."
+        }
+      ],
+      "processing_errors": [],
+      "page_count": null,
+      "pages_processed": 0,
+      "duration_seconds": 0.008528,
+      "duplicate_document_ids": []
+    },
+    {
+      "file": "missing_tax.csv",
+      "document_id": 4,
+      "worker_status": "completed",
+      "job_status": "completed",
+      "error": null,
+      "status": "completed",
+      "invoice": {
+        "invoice_number": "CG-EVAL-1003",
+        "invoice_date": "2026-05-10",
+        "supplier_name": "North Clinic",
+        "customer_name": "Care Guide",
+        "subtotal": "100.00",
+        "tax_amount": null,
+        "total_amount": "100.00",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Care visit",
+            "quantity": "2",
+            "unit_price": "50.00",
+            "line_total": "100.00",
+            "source_page": null,
+            "source_sheet": "CSV",
+            "source_snippet": "Care visit | 2 | 50.00 | 100.00"
+          },
+          {
+            "description": "Diagnostic kit",
+            "quantity": "1",
+            "unit_price": "0.00",
+            "line_total": "0.00",
+            "source_page": null,
+            "source_sheet": "CSV",
+            "source_snippet": "Diagnostic kit | 1 | 0.00 | 0.00"
+          }
+        ],
+        "extraction_method": "deterministic",
+        "field_status": {
+          "invoice_number": "present",
+          "invoice_date": "present",
+          "supplier_name": "present",
+          "customer_name": "present",
+          "subtotal": "present",
+          "tax_amount": "missing",
+          "total_amount": "present",
+          "currency": "present",
+          "line_items": "present"
+        },
+        "field_confidence": {
+          "invoice_number": 0.9,
+          "invoice_date": 0.9,
+          "supplier_name": 0.9,
+          "customer_name": 0.9,
+          "subtotal": 0.9,
+          "tax_amount": null,
+          "total_amount": 0.9,
+          "currency": 0.9,
+          "line_items": 0.9
+        },
+        "field_evidence": {
+          "invoice_number": [
+            {
+              "snippet": "Invoice Number: CG-EVAL-1003",
+              "sheet": "CSV",
+              "cell_coordinates": [
+                "A1",
+                "B1"
+              ]
+            }
+          ],
+          "invoice_date": [
+            {
+              "snippet": "Invoice Date: 2026-05-10",
+              "sheet": "CSV",
+              "cell_coordinates": [
+                "A2",
+                "B2"
+              ]
+            }
+          ],
+          "supplier_name": [
+            {
+              "snippet": "Supplier: North Clinic",
+              "sheet": "CSV",
+              "cell_coordinates": [
+                "A3",
+                "B3"
+              ]
+            }
+          ],
+          "customer_name": [
+            {
+              "snippet": "Customer: Care Guide",
+              "sheet": "CSV",
+              "cell_coordinates": [
+                "A4",
+                "B4"
+              ]
+            }
+          ],
+          "subtotal": [
+            {
+              "snippet": "Subtotal: 100.00",
+              "sheet": "CSV",
+              "cell_coordinates": [
+                "A6",
+                "B6"
+              ]
+            }
+          ],
+          "tax_amount": [],
+          "total_amount": [
+            {
+              "snippet": "Total: 100.00",
+              "sheet": "CSV",
+              "cell_coordinates": [
+                "A7",
+                "B7"
+              ]
+            }
+          ],
+          "currency": [
+            {
+              "snippet": "A1: Invoice Number\nB1: CG-EVAL-1003\nA2: Invoice Date\nB2: 2026-05-10\nA3: Supplier\nB3: North Clinic\nA4: Customer\nB4: Care Guide\nA5: Currency\nB5: USD\nA6: Subtotal\nB6: 100.00\nA7: Total\nB7: 100.00\nA9: Description\nB9: Quantity\nC9: Unit Price\nD9: Line Total\nA10: Care visit\nB10: 2\nC10: 50.00\nD10: 100.00\nA11: Diagnostic kit\nB11: 1\nC11: 0.00\nD11: 0.00",
+              "sheet": "CSV"
+            }
+          ],
+          "line_items": [
+            {
+              "snippet": "Care visit | 2 | 50.00 | 100.00",
+              "sheet": "CSV"
+            },
+            {
+              "snippet": "Diagnostic kit | 1 | 0.00 | 0.00",
+              "sheet": "CSV"
+            }
+          ]
+        },
+        "field_candidates": {
+          "invoice_number": [
+            "CG-EVAL-1003"
+          ],
+          "invoice_date": [
+            "2026-05-10"
+          ],
+          "supplier_name": [
+            "North Clinic"
+          ],
+          "customer_name": [
+            "Care Guide"
+          ],
+          "subtotal": [
+            "100.00"
+          ],
+          "total_amount": [
+            "100.00"
+          ],
+          "currency": [
+            "USD"
+          ]
+        },
+        "field_confidence_note": "Heuristic source-quality scores only; not statistically calibrated probabilities.",
+        "warnings": [
+          {
+            "code": "field_missing",
+            "field": "tax_amount",
+            "message": "No supported tax amount was found."
+          }
+        ],
+        "extraction_metadata": {
+          "ai_provider": null,
+          "ai_model": null,
+          "ai_enabled": false,
+          "ai_retry_limit": 0
+        }
+      },
+      "validation_codes": [
+        "field_missing"
+      ],
+      "ocr_used": false,
+      "warnings": [
+        {
+          "code": "csv_dialect_defaulted",
+          "message": "Could not infer delimiter; treated as comma separated."
+        },
+        {
+          "code": "inconsistent_column_count",
+          "row": 9,
+          "expected": 2,
+          "actual": 4
+        },
+        {
+          "code": "inconsistent_column_count",
+          "row": 10,
+          "expected": 2,
+          "actual": 4
+        },
+        {
+          "code": "inconsistent_column_count",
+          "row": 11,
+          "expected": 2,
+          "actual": 4
+        },
+        {
+          "code": "field_missing",
+          "field": "tax_amount",
+          "message": "No supported tax amount was found."
+        }
+      ],
+      "processing_errors": [],
+      "page_count": null,
+      "pages_processed": 0,
+      "duration_seconds": 0.006969,
+      "duplicate_document_ids": []
+    },
+    {
+      "file": "incorrect_total.pdf",
+      "document_id": 5,
+      "worker_status": "completed",
+      "job_status": "completed",
+      "error": null,
+      "status": "completed",
+      "invoice": {
+        "invoice_number": "CG-EVAL-1002",
+        "invoice_date": "2026-05-10",
+        "supplier_name": "North Clinic",
+        "customer_name": "Care Guide",
+        "subtotal": "120.00",
+        "tax_amount": "12.00",
+        "total_amount": "139.00",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Lab panel",
+            "quantity": "2",
+            "unit_price": "60.00",
+            "line_total": "120.00",
+            "source_page": 1,
+            "source_sheet": null,
+            "source_snippet": "Lab panel | 2 | 60.00 | 120.00"
+          }
+        ],
+        "extraction_method": "deterministic",
+        "field_status": {
+          "invoice_number": "present",
+          "invoice_date": "present",
+          "supplier_name": "present",
+          "customer_name": "present",
+          "subtotal": "present",
+          "tax_amount": "present",
+          "total_amount": "present",
+          "currency": "present",
+          "line_items": "present"
+        },
+        "field_confidence": {
+          "invoice_number": 0.9,
+          "invoice_date": 0.9,
+          "supplier_name": 0.9,
+          "customer_name": 0.9,
+          "subtotal": 0.9,
+          "tax_amount": 0.9,
+          "total_amount": 0.9,
+          "currency": 0.9,
+          "line_items": 0.9
+        },
+        "field_evidence": {
+          "invoice_number": [
+            {
+              "snippet": "Invoice Number: CG-EVAL-1002",
+              "page": 1
+            }
+          ],
+          "invoice_date": [
+            {
+              "snippet": "Invoice Date: 2026-05-10",
+              "page": 1
+            }
+          ],
+          "supplier_name": [
+            {
+              "snippet": "Supplier: North Clinic",
+              "page": 1
+            }
+          ],
+          "customer_name": [
+            {
+              "snippet": "Customer: Care Guide",
+              "page": 1
+            }
+          ],
+          "subtotal": [
+            {
+              "snippet": "Subtotal: 120.00",
+              "page": 1
+            }
+          ],
+          "tax_amount": [
+            {
+              "snippet": "Tax: 12.00",
+              "page": 1
+            }
+          ],
+          "total_amount": [
+            {
+              "snippet": "Total: 139.00",
+              "page": 1
+            }
+          ],
+          "currency": [
+            {
+              "snippet": "Invoice Number: CG-EVAL-1002\nInvoice Date: 2026-05-10\nSupplier: North Clinic\nCustomer: Care Guide\nCurrency: USD\nSubtotal: 120.00\nTax: 12.00\nTotal: 139.00\nDescription | Quantity | Unit Price | Line Total\nLab panel | 2 | 60.00 | 120.00",
+              "page": 1
+            }
+          ],
+          "line_items": [
+            {
+              "snippet": "Lab panel | 2 | 60.00 | 120.00",
+              "page": 1
+            }
+          ]
+        },
+        "field_candidates": {
+          "invoice_number": [
+            "CG-EVAL-1002"
+          ],
+          "invoice_date": [
+            "2026-05-10"
+          ],
+          "supplier_name": [
+            "North Clinic"
+          ],
+          "customer_name": [
+            "Care Guide"
+          ],
+          "subtotal": [
+            "120.00"
+          ],
+          "tax_amount": [
+            "12.00"
+          ],
+          "total_amount": [
+            "139.00"
+          ],
+          "currency": [
+            "USD"
+          ]
+        },
+        "field_confidence_note": "Heuristic source-quality scores only; not statistically calibrated probabilities.",
+        "warnings": [],
+        "extraction_metadata": {
+          "ai_provider": null,
+          "ai_model": null,
+          "ai_enabled": false,
+          "ai_retry_limit": 0
+        }
+      },
+      "validation_codes": [
+        "subtotal_tax_total_mismatch"
+      ],
+      "ocr_used": false,
+      "warnings": [],
+      "processing_errors": [],
+      "page_count": 1,
+      "pages_processed": 1,
+      "duration_seconds": 0.008553,
+      "duplicate_document_ids": []
+    },
+    {
+      "file": "duplicate_invoice.csv",
+      "document_id": 6,
+      "worker_status": "completed",
+      "job_status": "completed",
+      "error": null,
+      "status": "completed",
+      "invoice": {
+        "invoice_number": "CG-EVAL-1001",
+        "invoice_date": "2026-05-10",
+        "supplier_name": "North Clinic",
+        "customer_name": "Care Guide",
+        "subtotal": "100.00",
+        "tax_amount": "10.00",
+        "total_amount": "110.00",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Care visit",
+            "quantity": "2",
+            "unit_price": "50.00",
+            "line_total": "100.00",
+            "source_page": null,
+            "source_sheet": "CSV",
+            "source_snippet": "Care visit | 2 | 50.00 | 100.00"
+          },
+          {
+            "description": "Diagnostic kit",
+            "quantity": "1",
+            "unit_price": "0.00",
+            "line_total": "0.00",
+            "source_page": null,
+            "source_sheet": "CSV",
+            "source_snippet": "Diagnostic kit | 1 | 0.00 | 0.00"
+          }
+        ],
+        "extraction_method": "deterministic",
+        "field_status": {
+          "invoice_number": "present",
+          "invoice_date": "present",
+          "supplier_name": "present",
+          "customer_name": "present",
+          "subtotal": "present",
+          "tax_amount": "present",
+          "total_amount": "present",
+          "currency": "present",
+          "line_items": "present"
+        },
+        "field_confidence": {
+          "invoice_number": 0.9,
+          "invoice_date": 0.9,
+          "supplier_name": 0.9,
+          "customer_name": 0.9,
+          "subtotal": 0.9,
+          "tax_amount": 0.9,
+          "total_amount": 0.9,
+          "currency": 0.9,
+          "line_items": 0.9
+        },
+        "field_evidence": {
+          "invoice_number": [
+            {
+              "snippet": "Invoice Number: CG-EVAL-1001",
+              "sheet": "CSV",
+              "cell_coordinates": [
+                "A1",
+                "B1"
+              ]
+            }
+          ],
+          "invoice_date": [
+            {
+              "snippet": "Invoice Date: 2026-05-10",
+              "sheet": "CSV",
+              "cell_coordinates": [
+                "A2",
+                "B2"
+              ]
+            }
+          ],
+          "supplier_name": [
+            {
+              "snippet": "Supplier: North Clinic",
+              "sheet": "CSV",
+              "cell_coordinates": [
+                "A3",
+                "B3"
+              ]
+            }
+          ],
+          "customer_name": [
+            {
+              "snippet": "Customer: Care Guide",
+              "sheet": "CSV",
+              "cell_coordinates": [
+                "A4",
+                "B4"
+              ]
+            }
+          ],
+          "subtotal": [
+            {
+              "snippet": "Subtotal: 100.00",
+              "sheet": "CSV",
+              "cell_coordinates": [
+                "A6",
+                "B6"
+              ]
+            }
+          ],
+          "tax_amount": [
+            {
+              "snippet": "Tax: 10.00",
+              "sheet": "CSV",
+              "cell_coordinates": [
+                "A7",
+                "B7"
+              ]
+            }
+          ],
+          "total_amount": [
+            {
+              "snippet": "Total: 110.00",
+              "sheet": "CSV",
+              "cell_coordinates": [
+                "A8",
+                "B8"
+              ]
+            }
+          ],
+          "currency": [
+            {
+              "snippet": "A1: Invoice Number\nB1: CG-EVAL-1001\nA2: Invoice Date\nB2: 2026-05-10\nA3: Supplier\nB3: North Clinic\nA4: Customer\nB4: Care Guide\nA5: Currency\nB5: USD\nA6: Subtotal\nB6: 100.00\nA7: Tax\nB7: 10.00\nA8: Total\nB8: 110.00\nA9: Fixture note\nB9: A separate CSV export\nA11: Description\nB11: Quantity\nC11: Unit Price\nD11: Line Total\nA12: Care visit\nB12: 2\nC12: 50.00\nD12: 100.00\nA13: Diagnostic kit\nB13: 1\nC13: 0.00\nD13: 0.00",
+              "sheet": "CSV"
+            }
+          ],
+          "line_items": [
+            {
+              "snippet": "Care visit | 2 | 50.00 | 100.00",
+              "sheet": "CSV"
+            },
+            {
+              "snippet": "Diagnostic kit | 1 | 0.00 | 0.00",
+              "sheet": "CSV"
+            }
+          ]
+        },
+        "field_candidates": {
+          "invoice_number": [
+            "CG-EVAL-1001"
+          ],
+          "invoice_date": [
+            "2026-05-10"
+          ],
+          "supplier_name": [
+            "North Clinic"
+          ],
+          "customer_name": [
+            "Care Guide"
+          ],
+          "subtotal": [
+            "100.00"
+          ],
+          "tax_amount": [
+            "10.00"
+          ],
+          "total_amount": [
+            "110.00"
+          ],
+          "currency": [
+            "USD"
+          ]
+        },
+        "field_confidence_note": "Heuristic source-quality scores only; not statistically calibrated probabilities.",
+        "warnings": [],
+        "extraction_metadata": {
+          "ai_provider": null,
+          "ai_model": null,
+          "ai_enabled": false,
+          "ai_retry_limit": 0
+        }
+      },
+      "validation_codes": [
+        "duplicate_invoice"
+      ],
+      "ocr_used": false,
+      "warnings": [
+        {
+          "code": "csv_dialect_defaulted",
+          "message": "Could not infer delimiter; treated as comma separated."
+        },
+        {
+          "code": "inconsistent_column_count",
+          "row": 11,
+          "expected": 2,
+          "actual": 4
+        },
+        {
+          "code": "inconsistent_column_count",
+          "row": 12,
+          "expected": 2,
+          "actual": 4
+        },
+        {
+          "code": "inconsistent_column_count",
+          "row": 13,
+          "expected": 2,
+          "actual": 4
+        }
+      ],
+      "processing_errors": [],
+      "page_count": null,
+      "pages_processed": 0,
+      "duration_seconds": 0.006207,
+      "duplicate_document_ids": [
+        1,
+        2
+      ]
+    },
+    {
+      "file": "uncertain_invoice.png",
+      "document_id": 7,
+      "worker_status": "completed",
+      "job_status": "completed",
+      "error": null,
+      "status": "completed",
+      "invoice": {
+        "invoice_number": null,
+        "invoice_date": "2026-05-10",
+        "supplier_name": "North Clinic",
+        "customer_name": "Care Guide",
+        "subtotal": "100.00",
+        "tax_amount": "10.00",
+        "total_amount": "110.00",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Diagnostic visit",
+            "quantity": "2",
+            "unit_price": "50.00",
+            "line_total": "100.00",
+            "source_page": 1,
+            "source_sheet": null,
+            "source_snippet": "Diagnostic visit | 2 | 50.00 | 100.00"
+          },
+          {
+            "description": "Diagnostic kit",
+            "quantity": "1",
+            "unit_price": "0.00",
+            "line_total": "0.00",
+            "source_page": 1,
+            "source_sheet": null,
+            "source_snippet": "Diagnostic kit | 1 | 0.00 | 0.00"
+          }
+        ],
+        "extraction_method": "deterministic",
+        "field_status": {
+          "invoice_number": "uncertain",
+          "invoice_date": "low_confidence",
+          "supplier_name": "low_confidence",
+          "customer_name": "low_confidence",
+          "subtotal": "low_confidence",
+          "tax_amount": "low_confidence",
+          "total_amount": "low_confidence",
+          "currency": "low_confidence",
+          "line_items": "low_confidence"
+        },
+        "field_confidence": {
+          "invoice_number": null,
+          "invoice_date": 0.65,
+          "supplier_name": 0.65,
+          "customer_name": 0.65,
+          "subtotal": 0.65,
+          "tax_amount": 0.65,
+          "total_amount": 0.65,
+          "currency": 0.65,
+          "line_items": 0.65
+        },
+        "field_evidence": {
+          "invoice_number": [],
+          "invoice_date": [
+            {
+              "snippet": "Invoice Date: 2026-05-10",
+              "page": 1
+            }
+          ],
+          "supplier_name": [
+            {
+              "snippet": "Supplier: North Clinic",
+              "page": 1
+            }
+          ],
+          "customer_name": [
+            {
+              "snippet": "Customer: Care Guide",
+              "page": 1
+            }
+          ],
+          "subtotal": [
+            {
+              "snippet": "Subtotal: 100.00",
+              "page": 1
+            }
+          ],
+          "tax_amount": [
+            {
+              "snippet": "Tax: 10.00",
+              "page": 1
+            }
+          ],
+          "total_amount": [
+            {
+              "snippet": "Total: 110.00",
+              "page": 1
+            }
+          ],
+          "currency": [
+            {
+              "snippet": "Invoice Number: unreadable\nInvoice Date: 2026-05-10\nSupplier: North Clinic\nCustomer: Care Guide\nCurrency: USD\nSubtotal: 100.00\nTax: 10.00\nTotal: 110.00\nDescription | Quantity | Unit Price | Line Total\nDiagnostic visit | 2 | 50.00 | 100.00\nDiagnostic kit | 1 | 0.00 | 0.00",
+              "page": 1
+            }
+          ],
+          "line_items": [
+            {
+              "snippet": "Diagnostic visit | 2 | 50.00 | 100.00",
+              "page": 1
+            },
+            {
+              "snippet": "Diagnostic kit | 1 | 0.00 | 0.00",
+              "page": 1
+            }
+          ]
+        },
+        "field_candidates": {
+          "invoice_date": [
+            "2026-05-10"
+          ],
+          "supplier_name": [
+            "North Clinic"
+          ],
+          "customer_name": [
+            "Care Guide"
+          ],
+          "subtotal": [
+            "100.00"
+          ],
+          "tax_amount": [
+            "10.00"
+          ],
+          "total_amount": [
+            "110.00"
+          ],
+          "currency": [
+            "USD"
+          ]
+        },
+        "field_confidence_note": "Heuristic source-quality scores only; not statistically calibrated probabilities.",
+        "warnings": [
+          {
+            "code": "field_low_quality",
+            "field": "invoice_date",
+            "message": "The extracted invoice date has limited or OCR-derived evidence and needs review."
+          },
+          {
+            "code": "field_low_quality",
+            "field": "supplier_name",
+            "message": "The extracted supplier name has limited or OCR-derived evidence and needs review."
+          },
+          {
+            "code": "field_low_quality",
+            "field": "customer_name",
+            "message": "The extracted customer name has limited or OCR-derived evidence and needs review."
+          },
+          {
+            "code": "field_low_quality",
+            "field": "subtotal",
+            "message": "The extracted subtotal has limited or OCR-derived evidence and needs review."
+          },
+          {
+            "code": "field_low_quality",
+            "field": "tax_amount",
+            "message": "The extracted tax amount has limited or OCR-derived evidence and needs review."
+          },
+          {
+            "code": "field_low_quality",
+            "field": "total_amount",
+            "message": "The extracted total amount has limited or OCR-derived evidence and needs review."
+          },
+          {
+            "code": "field_low_quality",
+            "field": "currency",
+            "message": "The extracted currency has limited or OCR-derived evidence and needs review."
+          },
+          {
+            "code": "field_low_quality",
+            "field": "line_items",
+            "message": "The extracted line items has limited or OCR-derived evidence and needs review."
+          },
+          {
+            "code": "field_uncertain",
+            "field": "invoice_number",
+            "message": "Source marks invoice number as unreadable or uncertain; no value was invented."
+          },
+          {
+            "code": "ocr_source",
+            "message": "Some extraction evidence came from OCR and should be reviewed."
+          }
+        ],
+        "extraction_metadata": {
+          "ai_provider": null,
+          "ai_model": null,
+          "ai_enabled": false,
+          "ai_retry_limit": 0
+        }
+      },
+      "validation_codes": [
+        "field_low_quality",
+        "field_uncertain",
+        "ocr_source",
+        "required_field_missing"
+      ],
+      "ocr_used": true,
+      "warnings": [
+        {
+          "code": "field_low_quality",
+          "field": "invoice_date",
+          "message": "The extracted invoice date has limited or OCR-derived evidence and needs review."
+        },
+        {
+          "code": "field_low_quality",
+          "field": "supplier_name",
+          "message": "The extracted supplier name has limited or OCR-derived evidence and needs review."
+        },
+        {
+          "code": "field_low_quality",
+          "field": "customer_name",
+          "message": "The extracted customer name has limited or OCR-derived evidence and needs review."
+        },
+        {
+          "code": "field_low_quality",
+          "field": "subtotal",
+          "message": "The extracted subtotal has limited or OCR-derived evidence and needs review."
+        },
+        {
+          "code": "field_low_quality",
+          "field": "tax_amount",
+          "message": "The extracted tax amount has limited or OCR-derived evidence and needs review."
+        },
+        {
+          "code": "field_low_quality",
+          "field": "total_amount",
+          "message": "The extracted total amount has limited or OCR-derived evidence and needs review."
+        },
+        {
+          "code": "field_low_quality",
+          "field": "currency",
+          "message": "The extracted currency has limited or OCR-derived evidence and needs review."
+        },
+        {
+          "code": "field_low_quality",
+          "field": "line_items",
+          "message": "The extracted line items has limited or OCR-derived evidence and needs review."
+        },
+        {
+          "code": "field_uncertain",
+          "field": "invoice_number",
+          "message": "Source marks invoice number as unreadable or uncertain; no value was invented."
+        },
+        {
+          "code": "ocr_source",
+          "message": "Some extraction evidence came from OCR and should be reviewed."
+        }
+      ],
+      "processing_errors": [],
+      "page_count": 1,
+      "pages_processed": 1,
+      "duration_seconds": 0.277051,
+      "duplicate_document_ids": []
+    },
+    {
+      "file": "scanned_invoice.jpg",
+      "document_id": 8,
+      "worker_status": "completed",
+      "job_status": "completed",
+      "error": null,
+      "status": "completed",
+      "invoice": {
+        "invoice_number": "CG-EVAL-1005",
+        "invoice_date": "2026-05-10",
+        "supplier_name": "North Clinic",
+        "customer_name": "Care Guide",
+        "subtotal": "100.00",
+        "tax_amount": "10.00",
+        "total_amount": "110.00",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Scanned consultation",
+            "quantity": "2",
+            "unit_price": "50.00",
+            "line_total": "100.00",
+            "source_page": 1,
+            "source_sheet": null,
+            "source_snippet": "Scanned consultation | 2 | 50.00 | 100.00"
+          },
+          {
+            "description": "Diagnostic kit",
+            "quantity": "1",
+            "unit_price": "0.00",
+            "line_total": "0.00",
+            "source_page": 1,
+            "source_sheet": null,
+            "source_snippet": "Diagnostic kit | 1 | 0.00 | 0.00"
+          }
+        ],
+        "extraction_method": "deterministic",
+        "field_status": {
+          "invoice_number": "low_confidence",
+          "invoice_date": "low_confidence",
+          "supplier_name": "low_confidence",
+          "customer_name": "low_confidence",
+          "subtotal": "low_confidence",
+          "tax_amount": "low_confidence",
+          "total_amount": "low_confidence",
+          "currency": "low_confidence",
+          "line_items": "low_confidence"
+        },
+        "field_confidence": {
+          "invoice_number": 0.65,
+          "invoice_date": 0.65,
+          "supplier_name": 0.65,
+          "customer_name": 0.65,
+          "subtotal": 0.65,
+          "tax_amount": 0.65,
+          "total_amount": 0.65,
+          "currency": 0.65,
+          "line_items": 0.65
+        },
+        "field_evidence": {
+          "invoice_number": [
+            {
+              "snippet": "Invoice Number: CG-EVAL-1005",
+              "page": 1
+            }
+          ],
+          "invoice_date": [
+            {
+              "snippet": "Invoice Date: 2026-05-10",
+              "page": 1
+            }
+          ],
+          "supplier_name": [
+            {
+              "snippet": "Supplier: North Clinic",
+              "page": 1
+            }
+          ],
+          "customer_name": [
+            {
+              "snippet": "Customer: Care Guide",
+              "page": 1
+            }
+          ],
+          "subtotal": [
+            {
+              "snippet": "Subtotal: 100.00",
+              "page": 1
+            }
+          ],
+          "tax_amount": [
+            {
+              "snippet": "Tax: 10.00",
+              "page": 1
+            }
+          ],
+          "total_amount": [
+            {
+              "snippet": "Total: 110.00",
+              "page": 1
+            }
+          ],
+          "currency": [
+            {
+              "snippet": "Invoice Number: CG-EVAL-1005\nInvoice Date: 2026-05-10\nSupplier: North Clinic\nCustomer: Care Guide\nCurrency: USD\nSubtotal: 100.00\nTax: 10.00\nTotal: 110.00\nDescription | Quantity | Unit Price | Line Total\nScanned consultation | 2 | 50.00 | 100.00\nDiagnostic kit | 1 | 0.00 | 0.00",
+              "page": 1
+            }
+          ],
+          "line_items": [
+            {
+              "snippet": "Scanned consultation | 2 | 50.00 | 100.00",
+              "page": 1
+            },
+            {
+              "snippet": "Diagnostic kit | 1 | 0.00 | 0.00",
+              "page": 1
+            }
+          ]
+        },
+        "field_candidates": {
+          "invoice_number": [
+            "CG-EVAL-1005"
+          ],
+          "invoice_date": [
+            "2026-05-10"
+          ],
+          "supplier_name": [
+            "North Clinic"
+          ],
+          "customer_name": [
+            "Care Guide"
+          ],
+          "subtotal": [
+            "100.00"
+          ],
+          "tax_amount": [
+            "10.00"
+          ],
+          "total_amount": [
+            "110.00"
+          ],
+          "currency": [
+            "USD"
+          ]
+        },
+        "field_confidence_note": "Heuristic source-quality scores only; not statistically calibrated probabilities.",
+        "warnings": [
+          {
+            "code": "field_low_quality",
+            "field": "invoice_number",
+            "message": "The extracted invoice number has limited or OCR-derived evidence and needs review."
+          },
+          {
+            "code": "field_low_quality",
+            "field": "invoice_date",
+            "message": "The extracted invoice date has limited or OCR-derived evidence and needs review."
+          },
+          {
+            "code": "field_low_quality",
+            "field": "supplier_name",
+            "message": "The extracted supplier name has limited or OCR-derived evidence and needs review."
+          },
+          {
+            "code": "field_low_quality",
+            "field": "customer_name",
+            "message": "The extracted customer name has limited or OCR-derived evidence and needs review."
+          },
+          {
+            "code": "field_low_quality",
+            "field": "subtotal",
+            "message": "The extracted subtotal has limited or OCR-derived evidence and needs review."
+          },
+          {
+            "code": "field_low_quality",
+            "field": "tax_amount",
+            "message": "The extracted tax amount has limited or OCR-derived evidence and needs review."
+          },
+          {
+            "code": "field_low_quality",
+            "field": "total_amount",
+            "message": "The extracted total amount has limited or OCR-derived evidence and needs review."
+          },
+          {
+            "code": "field_low_quality",
+            "field": "currency",
+            "message": "The extracted currency has limited or OCR-derived evidence and needs review."
+          },
+          {
+            "code": "field_low_quality",
+            "field": "line_items",
+            "message": "The extracted line items has limited or OCR-derived evidence and needs review."
+          },
+          {
+            "code": "ocr_source",
+            "message": "Some extraction evidence came from OCR and should be reviewed."
+          }
+        ],
+        "extraction_metadata": {
+          "ai_provider": null,
+          "ai_model": null,
+          "ai_enabled": false,
+          "ai_retry_limit": 0
+        }
+      },
+      "validation_codes": [
+        "field_low_quality",
+        "ocr_source"
+      ],
+      "ocr_used": true,
+      "warnings": [
+        {
+          "code": "field_low_quality",
+          "field": "invoice_number",
+          "message": "The extracted invoice number has limited or OCR-derived evidence and needs review."
+        },
+        {
+          "code": "field_low_quality",
+          "field": "invoice_date",
+          "message": "The extracted invoice date has limited or OCR-derived evidence and needs review."
+        },
+        {
+          "code": "field_low_quality",
+          "field": "supplier_name",
+          "message": "The extracted supplier name has limited or OCR-derived evidence and needs review."
+        },
+        {
+          "code": "field_low_quality",
+          "field": "customer_name",
+          "message": "The extracted customer name has limited or OCR-derived evidence and needs review."
+        },
+        {
+          "code": "field_low_quality",
+          "field": "subtotal",
+          "message": "The extracted subtotal has limited or OCR-derived evidence and needs review."
+        },
+        {
+          "code": "field_low_quality",
+          "field": "tax_amount",
+          "message": "The extracted tax amount has limited or OCR-derived evidence and needs review."
+        },
+        {
+          "code": "field_low_quality",
+          "field": "total_amount",
+          "message": "The extracted total amount has limited or OCR-derived evidence and needs review."
+        },
+        {
+          "code": "field_low_quality",
+          "field": "currency",
+          "message": "The extracted currency has limited or OCR-derived evidence and needs review."
+        },
+        {
+          "code": "field_low_quality",
+          "field": "line_items",
+          "message": "The extracted line items has limited or OCR-derived evidence and needs review."
+        },
+        {
+          "code": "ocr_source",
+          "message": "Some extraction evidence came from OCR and should be reviewed."
+        }
+      ],
+      "processing_errors": [],
+      "page_count": 1,
+      "pages_processed": 1,
+      "duration_seconds": 0.265359,
+      "duplicate_document_ids": []
+    },
+    {
+      "file": "scanned_invoice.pdf",
+      "document_id": 9,
+      "worker_status": "completed",
+      "job_status": "completed",
+      "error": null,
+      "status": "completed",
+      "invoice": {
+        "invoice_number": "CG-EVAL-1005",
+        "invoice_date": "2026-05-10",
+        "supplier_name": "North Clinic",
+        "customer_name": "Care Guide",
+        "subtotal": "100.00",
+        "tax_amount": "10.00",
+        "total_amount": "110.00",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Scanned consultation",
+            "quantity": "2",
+            "unit_price": "50.00",
+            "line_total": "100.00",
+            "source_page": 1,
+            "source_sheet": null,
+            "source_snippet": "Scanned consultation | 2 | 50.00 | 100.00"
+          },
+          {
+            "description": "Diagnostic kit",
+            "quantity": "1",
+            "unit_price": "0.00",
+            "line_total": "0.00",
+            "source_page": 1,
+            "source_sheet": null,
+            "source_snippet": "Diagnostic kit | 1 | 0.00 | 0.00"
+          }
+        ],
+        "extraction_method": "deterministic",
+        "field_status": {
+          "invoice_number": "low_confidence",
+          "invoice_date": "low_confidence",
+          "supplier_name": "low_confidence",
+          "customer_name": "low_confidence",
+          "subtotal": "low_confidence",
+          "tax_amount": "low_confidence",
+          "total_amount": "low_confidence",
+          "currency": "low_confidence",
+          "line_items": "low_confidence"
+        },
+        "field_confidence": {
+          "invoice_number": 0.65,
+          "invoice_date": 0.65,
+          "supplier_name": 0.65,
+          "customer_name": 0.65,
+          "subtotal": 0.65,
+          "tax_amount": 0.65,
+          "total_amount": 0.65,
+          "currency": 0.65,
+          "line_items": 0.65
+        },
+        "field_evidence": {
+          "invoice_number": [
+            {
+              "snippet": "Invoice Number: CG-EVAL-1005",
+              "page": 1
+            }
+          ],
+          "invoice_date": [
+            {
+              "snippet": "Invoice Date: 2026-05-10",
+              "page": 1
+            }
+          ],
+          "supplier_name": [
+            {
+              "snippet": "Supplier: North Clinic",
+              "page": 1
+            }
+          ],
+          "customer_name": [
+            {
+              "snippet": "Customer: Care Guide",
+              "page": 1
+            }
+          ],
+          "subtotal": [
+            {
+              "snippet": "Subtotal: 100.00",
+              "page": 1
+            }
+          ],
+          "tax_amount": [
+            {
+              "snippet": "Tax: 10.00",
+              "page": 1
+            }
+          ],
+          "total_amount": [
+            {
+              "snippet": "Total: 110.00",
+              "page": 1
+            }
+          ],
+          "currency": [
+            {
+              "snippet": "Invoice Number: CG-EVAL-1005\nInvoice Date: 2026-05-10\nSupplier: North Clinic\nCustomer: Care Guide\nCurrency: USD\nSubtotal: 100.00\nTax: 10.00\nTotal: 110.00\nDescription | Quantity | Unit Price | Line Total\nScanned consultation | 2 | 50.00 | 100.00\nDiagnostic kit | 1 | 0.00 | 0.00",
+              "page": 1
+            }
+          ],
+          "line_items": [
+            {
+              "snippet": "Scanned consultation | 2 | 50.00 | 100.00",
+              "page": 1
+            },
+            {
+              "snippet": "Diagnostic kit | 1 | 0.00 | 0.00",
+              "page": 1
+            }
+          ]
+        },
+        "field_candidates": {
+          "invoice_number": [
+            "CG-EVAL-1005"
+          ],
+          "invoice_date": [
+            "2026-05-10"
+          ],
+          "supplier_name": [
+            "North Clinic"
+          ],
+          "customer_name": [
+            "Care Guide"
+          ],
+          "subtotal": [
+            "100.00"
+          ],
+          "tax_amount": [
+            "10.00"
+          ],
+          "total_amount": [
+            "110.00"
+          ],
+          "currency": [
+            "USD"
+          ]
+        },
+        "field_confidence_note": "Heuristic source-quality scores only; not statistically calibrated probabilities.",
+        "warnings": [
+          {
+            "code": "field_low_quality",
+            "field": "invoice_number",
+            "message": "The extracted invoice number has limited or OCR-derived evidence and needs review."
+          },
+          {
+            "code": "field_low_quality",
+            "field": "invoice_date",
+            "message": "The extracted invoice date has limited or OCR-derived evidence and needs review."
+          },
+          {
+            "code": "field_low_quality",
+            "field": "supplier_name",
+            "message": "The extracted supplier name has limited or OCR-derived evidence and needs review."
+          },
+          {
+            "code": "field_low_quality",
+            "field": "customer_name",
+            "message": "The extracted customer name has limited or OCR-derived evidence and needs review."
+          },
+          {
+            "code": "field_low_quality",
+            "field": "subtotal",
+            "message": "The extracted subtotal has limited or OCR-derived evidence and needs review."
+          },
+          {
+            "code": "field_low_quality",
+            "field": "tax_amount",
+            "message": "The extracted tax amount has limited or OCR-derived evidence and needs review."
+          },
+          {
+            "code": "field_low_quality",
+            "field": "total_amount",
+            "message": "The extracted total amount has limited or OCR-derived evidence and needs review."
+          },
+          {
+            "code": "field_low_quality",
+            "field": "currency",
+            "message": "The extracted currency has limited or OCR-derived evidence and needs review."
+          },
+          {
+            "code": "field_low_quality",
+            "field": "line_items",
+            "message": "The extracted line items has limited or OCR-derived evidence and needs review."
+          },
+          {
+            "code": "ocr_source",
+            "message": "Some extraction evidence came from OCR and should be reviewed."
+          }
+        ],
+        "extraction_metadata": {
+          "ai_provider": null,
+          "ai_model": null,
+          "ai_enabled": false,
+          "ai_retry_limit": 0
+        }
+      },
+      "validation_codes": [
+        "duplicate_invoice",
+        "field_low_quality",
+        "ocr_source"
+      ],
+      "ocr_used": true,
+      "warnings": [
+        {
+          "code": "field_low_quality",
+          "field": "invoice_number",
+          "message": "The extracted invoice number has limited or OCR-derived evidence and needs review."
+        },
+        {
+          "code": "field_low_quality",
+          "field": "invoice_date",
+          "message": "The extracted invoice date has limited or OCR-derived evidence and needs review."
+        },
+        {
+          "code": "field_low_quality",
+          "field": "supplier_name",
+          "message": "The extracted supplier name has limited or OCR-derived evidence and needs review."
+        },
+        {
+          "code": "field_low_quality",
+          "field": "customer_name",
+          "message": "The extracted customer name has limited or OCR-derived evidence and needs review."
+        },
+        {
+          "code": "field_low_quality",
+          "field": "subtotal",
+          "message": "The extracted subtotal has limited or OCR-derived evidence and needs review."
+        },
+        {
+          "code": "field_low_quality",
+          "field": "tax_amount",
+          "message": "The extracted tax amount has limited or OCR-derived evidence and needs review."
+        },
+        {
+          "code": "field_low_quality",
+          "field": "total_amount",
+          "message": "The extracted total amount has limited or OCR-derived evidence and needs review."
+        },
+        {
+          "code": "field_low_quality",
+          "field": "currency",
+          "message": "The extracted currency has limited or OCR-derived evidence and needs review."
+        },
+        {
+          "code": "field_low_quality",
+          "field": "line_items",
+          "message": "The extracted line items has limited or OCR-derived evidence and needs review."
+        },
+        {
+          "code": "ocr_source",
+          "message": "Some extraction evidence came from OCR and should be reviewed."
+        }
+      ],
+      "processing_errors": [],
+      "page_count": 1,
+      "pages_processed": 1,
+      "duration_seconds": 0.371342,
+      "duplicate_document_ids": [
+        8
+      ]
+    },
+    {
+      "file": "corrupted.pdf",
+      "document_id": 10,
+      "worker_status": "failed",
+      "job_status": "failed",
+      "error": "FileDataError: Failed to open file '[evaluation temp]\\\\uploads\\\\f6ef523554384920b78f68734f8e2016.pdf'.",
+      "status": "failed",
+      "invoice": {},
+      "validation_codes": [],
+      "ocr_used": false,
+      "warnings": [],
+      "processing_errors": [],
+      "page_count": null,
+      "pages_processed": 0,
+      "duration_seconds": 0.014627,
+      "duplicate_document_ids": []
+    }
+  ],
+  "limitations": [
+    "Synthetic fixtures are small and are not representative of vendor diversity or production prevalence.",
+    "Real OCR was measured only if the configured Tesseract executable was available.",
+    "Ollama and sentence-transformers are not used for this extraction evaluation.",
+    "A 1,000-page performance result is reported only when --benchmark-pages 1000 is run."
+  ],
+  "long_pdf_benchmark": {
+    "pages_requested": 1000,
+    "pages_reported": 1000,
+    "pages_processed": 1000,
+    "status": "completed",
+    "seconds": 0.0776,
+    "seconds_per_processed_page": 7.8e-05,
+    "ocr_used": false,
+    "measurement_note": "This run generates and processes a local digital-text PDF. It measures this environment only; it is not a concurrency or scanned-PDF benchmark."
+  }
+}

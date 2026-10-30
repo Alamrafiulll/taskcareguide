@@ -1,6 +1,6 @@
 # Assessment walkthrough script (about 6 minutes)
 
-Run the API, worker, and frontend in three PowerShell windows using the commands in the root README. Keep all documents in `evaluation/dataset`; they are synthetic. Start with `/api/ready` and mention that OCR is optional and unavailable on this assessment machine unless the response reports it as ready.
+Run the API, worker, and frontend in three PowerShell windows using the [Windows setup guide](setup-and-run.md). Keep all documents in `evaluation/dataset`; they are synthetic. Start with `/api/ready` and show whether the local Tesseract OCR executable is available. Scanned documents need Tesseract; digital PDFs and spreadsheets do not.
 
 ## 0:00–0:45 — Start-up and readiness
 

@@ -1,0 +1,5 @@
+Invoice Number,CG-DEMO-MALFORMED
+
+Description,Quantity,Unit Price,Line Total
+Care visit,2,50.00,100.00
+A malformed extra column,1,0.00,0.00,unexpected

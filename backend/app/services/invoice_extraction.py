@@ -7,7 +7,7 @@ import logging
 import re
 import urllib.error
 import urllib.request
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -69,6 +69,10 @@ def _segments_evidence(normalized: dict[str, Any]) -> list[dict[str, Any]]:
             if cell_text:
                 evidence.append({**location, "text": cell_text, "row": row.get("row_number")})
             values = row.get("values", [])
+            if values and not cell_text:
+                value_text = " | ".join("" if value is None else str(value) for value in values).strip(" |")
+                if value_text:
+                    evidence.append({**location, "text": value_text, "row": row.get("row_number")})
             if len(values) >= 2 and values[0] is not None and values[1] is not None:
                 label = str(values[0]).strip()
                 if any(re.search(rf"\b(?:{pattern})\b", label, re.I) for pattern in FIELD_LABELS.values()):
@@ -293,10 +297,12 @@ def _ollama_extract(settings: Settings, evidence_text: str) -> InvoiceExtraction
         return None
     prompt = (
         "Extract invoice values only when directly supported by the supplied evidence. "
-        "Use null for unknown values; never infer missing facts. Return JSON matching this schema: "
+        "Use null for unknown scalar values and an empty array for unknown line items. "
+        "Never infer or invent facts. Return only JSON with exactly these keys: "
         '{"invoice_number":null,"invoice_date":null,"supplier_name":null,"customer_name":null,'
-        '"subtotal":null,"tax_amount":null,"total_amount":null,"currency":null,"line_items":[]}\n'
-        "Each line item has description, quantity, unit_price, line_total, source_page, source_sheet, source_snippet.\n"
+        '"subtotal":null,"tax_amount":null,"total_amount":null,"currency":null,"line_items":[]} '
+        "Each line item has description, quantity, unit_price, line_total, source_page, source_sheet, source_snippet. "
+        "Return monetary and quantity values as decimal strings when possible.\n"
         "Evidence:\n" + evidence_text[:60000]
     )
     endpoint = settings.ollama_base_url.rstrip("/") + "/api/generate"
@@ -332,14 +338,120 @@ def _ollama_extract(settings: Settings, evidence_text: str) -> InvoiceExtraction
     return None
 
 
+def active_ai_provider(settings: Settings) -> str | None:
+    """Resolve the explicitly configured provider without exposing credentials.
+
+    OLLAMA_ENABLED remains supported for existing local installations when
+    AI_PROVIDER is left at its default `none` value.
+    """
+    if settings.ai_provider == "gemini":
+        return "gemini" if settings.gemini_api_key and settings.gemini_api_key.get_secret_value().strip() else None
+    if settings.ai_provider == "ollama" or (settings.ai_provider == "none" and settings.ollama_enabled):
+        return "ollama" if settings.ollama_enabled and settings.ollama_model.strip() else None
+    return None
+
+
+def active_ai_model(settings: Settings) -> str | None:
+    provider = active_ai_provider(settings)
+    if provider == "gemini":
+        return settings.gemini_model
+    if provider == "ollama":
+        return settings.ollama_model
+    return None
+
+
+def _validate_ai_candidate(candidate: InvoiceExtraction, evidence_text: str) -> InvoiceExtraction:
+    # Reject the complete model result if any non-null value is not supported by
+    # the supplied extraction evidence. This is a conservative grounding guard,
+    # not a guarantee that the source itself is correct.
+    for field in FIELD_LABELS:
+        if not _grounded(getattr(candidate, field), evidence_text):
+            raise ValueError(f"Ungrounded value for {field}")
+    if not _grounded(candidate.currency, evidence_text):
+        raise ValueError("Ungrounded currency")
+    for item in candidate.line_items:
+        for value in (item.description, item.quantity, item.unit_price, item.line_total):
+            if value is not None and not _grounded(value, evidence_text):
+                raise ValueError("Ungrounded line item")
+    return candidate
+
+
+def _gemini_extract(settings: Settings, evidence_text: str) -> InvoiceExtraction | None:
+    """Call Gemini only when explicitly selected and an API key is configured.
+
+    The key is sent in a request header (never the URL) and is never logged.
+    Output is parsed and validated using the same Pydantic schema and grounding
+    rules as local Ollama output.
+    """
+    if active_ai_provider(settings) != "gemini":
+        return None
+    prompt = (
+        "Extract invoice values only when directly supported by the supplied evidence. "
+        "Use null for unknown scalar values and an empty array for unknown line items. "
+        "Never infer or invent facts. Return only JSON with exactly these keys: "
+        '{"invoice_number":null,"invoice_date":null,"supplier_name":null,"customer_name":null,'
+        '"subtotal":null,"tax_amount":null,"total_amount":null,"currency":null,"line_items":[]} '
+        "Each line item has description, quantity, unit_price, line_total, source_page, source_sheet, source_snippet. "
+        "Return monetary and quantity values as decimal strings when possible.\nEvidence:\n" + evidence_text[:60000]
+    )
+    model = quote(settings.gemini_model.strip(), safe="")
+    endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    api_key = settings.gemini_api_key.get_secret_value()
+    request_body = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0, "responseMimeType": "application/json"},
+    }
+    for attempt in range(RETRY_LIMIT):
+        request = urllib.request.Request(
+            endpoint,
+            data=json.dumps(request_body).encode("utf-8"),
+            headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=settings.gemini_timeout_seconds) as response:
+                outer = json.loads(response.read().decode("utf-8"))
+            candidates = outer.get("candidates") or []
+            parts = (candidates[0].get("content") or {}).get("parts") or [] if candidates else []
+            raw = "".join(part.get("text", "") for part in parts if isinstance(part, dict))
+            if not raw:
+                raise ValueError("Gemini returned no structured text")
+            payload = json.loads(raw)
+            candidate = InvoiceExtraction.model_validate(payload)
+            return _validate_ai_candidate(candidate, evidence_text)
+        except urllib.error.HTTPError as exc:
+            # Do not log response bodies: provider errors can contain request data.
+            logger.warning("Gemini extraction attempt %s/%s failed with HTTP %s",
+                           attempt + 1, RETRY_LIMIT, exc.code)
+        except (urllib.error.URLError, TimeoutError, OSError, ValueError,
+                ValidationError, json.JSONDecodeError) as exc:
+            logger.warning("Gemini extraction attempt %s/%s failed: %s",
+                           attempt + 1, RETRY_LIMIT, type(exc).__name__)
+    return None
+
+
+def _configured_ai_extract(settings: Settings, evidence_text: str) -> tuple[InvoiceExtraction, str, str] | None:
+    provider = active_ai_provider(settings)
+    if provider == "gemini":
+        candidate = _gemini_extract(settings, evidence_text)
+        return (candidate, provider, settings.gemini_model) if candidate else None
+    if provider == "ollama":
+        candidate = _ollama_extract(settings, evidence_text)
+        return (candidate, provider, settings.ollama_model) if candidate else None
+    return None
+
+
 def extract_invoice(normalized: dict[str, Any], settings: Settings | None = None) -> dict[str, Any]:
     settings = settings or get_settings()
     deterministic, evidence, candidates = deterministic_extraction(normalized)
     evidence_text = "\n".join(source["text"] for source in _segments_evidence(normalized))
     method = "deterministic"
     extracted = deterministic
-    llm = _ollama_extract(settings, evidence_text)
-    if llm is not None:
+    ai_result = _configured_ai_extract(settings, evidence_text)
+    ai_provider = None
+    ai_model = None
+    if ai_result is not None:
+        llm, ai_provider, ai_model = ai_result
         merged = deterministic.model_dump()
         llm_fields = []
         for field in FIELD_LABELS.keys() | {"currency"}:
@@ -356,7 +468,7 @@ def extract_invoice(normalized: dict[str, Any], settings: Settings | None = None
                 merged["line_items"] = [item.model_dump() for item in supported_items]
                 llm_fields.append("line_items")
         extracted = InvoiceExtraction.model_validate(merged)
-        method = "deterministic+ollama"
+        method = f"deterministic+{ai_provider}"
         segments = normalized.get("segments", [])
         for field in llm_fields:
             value = getattr(extracted, field)
@@ -409,9 +521,12 @@ def extract_invoice(normalized: dict[str, Any], settings: Settings | None = None
                    "field_confidence": confidence, "field_evidence": evidence,
                    "field_candidates": candidates,
                    "field_confidence_note": "Heuristic source-quality scores only; not statistically calibrated probabilities.",
-                   "warnings": warnings, "extraction_metadata": {"ollama_enabled": settings.ollama_enabled,
-                   "ollama_model": settings.ollama_model if method.endswith("ollama") else None,
-                   "ollama_retry_limit": RETRY_LIMIT if settings.ollama_enabled else 0}})
+                   "warnings": warnings, "extraction_metadata": {
+                       "ai_provider": ai_provider,
+                       "ai_model": ai_model,
+                       "ai_enabled": active_ai_provider(settings) is not None,
+                       "ai_retry_limit": RETRY_LIMIT if active_ai_provider(settings) else 0,
+                   }})
     return result
 
 
@@ -427,9 +542,10 @@ def suggest_invoice_corrections(normalized: dict[str, Any], current_invoice: dic
     evidence_lines = [line.strip() for source in evidence_sources
                       for line in source["text"].splitlines() if line.strip()]
     evidence_text = "\n".join(source["text"] for source in evidence_sources)
-    candidate = _ollama_extract(settings, evidence_text)
-    if candidate is None:
+    ai_result = _configured_ai_extract(settings, evidence_text)
+    if ai_result is None:
         return None
+    candidate, provider, model_name = ai_result
 
     review_fields = set()
     for warning in current_invoice.get("warnings") or []:
@@ -484,4 +600,4 @@ def suggest_invoice_corrections(normalized: dict[str, Any], current_invoice: dic
                                                          for item in proposed_items):
             proposals.append({"field": "line_items", "current_value": current_items,
                               "suggested_value": proposed_items, "evidence": snippets[:6]})
-    return {"model": settings.ollama_model, "suggestions": proposals}
+    return {"provider": provider, "model": model_name, "suggestions": proposals}

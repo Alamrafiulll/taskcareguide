@@ -67,7 +67,7 @@ class ExtractedLineItem(APIModel):
 
 
 class InvoiceExtraction(APIModel):
-    """Validated invoice shape used for deterministic and Ollama extraction."""
+    """Validated invoice shape used by deterministic and optional AI extraction."""
     model_config = ConfigDict(extra="forbid")
     invoice_number: str | None = None
     invoice_date: str | None = None
@@ -109,6 +109,7 @@ class InvoiceCorrectionSuggestion(APIModel):
 class InvoiceCorrectionSuggestionsRead(APIModel):
     document_id: int
     status: str
+    provider: str = "ollama"
     model: str
     suggestions: list[InvoiceCorrectionSuggestion] = Field(default_factory=list)
 

@@ -25,6 +25,14 @@ function mockApi(options: { uploadError?: boolean; localAI?: boolean; documents?
     const url = String(input)
     calls.push({ url, init })
     if (url.endsWith('/api/ready')) return Response.json({ status: 'ready', checks: { database: 'ok', worker: 'ok', ocr: 'optional_not_installed', local_ai: options.localAI ? 'enabled' : 'disabled' } })
+    if (url.endsWith('/api/documents/compare') && init?.method === 'POST') return Response.json({
+      comparable: true, review_recommended: false,
+      matched_fields: [{ field: 'invoice_number', value: 'CG-44' }], mismatched_fields: [], missing_fields: [], reasons: [],
+    })
+    if (url.endsWith('/api/documents/44') && init?.method === 'DELETE') {
+      options.documents = []
+      return new Response(null, { status: 204 })
+    }
     if (url.includes('/api/documents/upload') && init?.method === 'POST') {
       if (options.uploadError) return Response.json({ error: { code: 'invalid_signature', message: 'The selected PDF is not a valid PDF file.' } }, { status: 422 })
       options.documents = [row({ filename: 'new-invoice.csv', id: 45, status: 'queued', job: { status: 'queued', retry_count: 0, attempt_count: 0, permanent_failure: false } })]
@@ -34,7 +42,7 @@ function mockApi(options: { uploadError?: boolean; localAI?: boolean; documents?
     if (url.endsWith('/api/documents/44/invoice') && init?.method === 'PUT') return Response.json(invoice)
     if (url.endsWith('/api/documents/44/invoice')) return Response.json(invoice)
     if (url.endsWith('/api/documents/44/invoice/ai-suggestions') && init?.method === 'POST') return Response.json({
-      document_id: 44, status: 'suggestions_ready', model: 'local-test-model', suggestions: [
+      document_id: 44, status: 'suggestions_ready', provider: 'ollama', model: 'local-test-model', suggestions: [
         { field: 'total_amount', current_value: '125.00', suggested_value: '120.00', evidence: ['Total: 120.00'] },
       ],
     })
@@ -114,9 +122,39 @@ describe('document workspace', () => {
     expect(screen.getByLabelText('Line 1 description')).toHaveProperty('value', 'Consultation')
     await user.click(screen.getByText('More details (optional)'))
     expect(screen.getByText('processing completed')).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Download reviewed result' })).toHaveProperty('href', expect.stringContaining('view=corrected'))
-    await user.click(screen.getByText('Other downloads'))
-    expect(screen.getByRole('link', { name: 'Download original JSON' })).toHaveProperty('href', expect.stringContaining('view=original'))
+    expect(screen.getByRole('link', { name: 'Download reviewed invoice (PDF)' })).toHaveProperty('href', expect.stringContaining('/api/documents/44/invoice.pdf'))
+    expect(screen.getByRole('link', { name: 'Download original file' })).toHaveProperty('href', expect.stringContaining('/api/documents/44/source'))
+    await user.click(screen.getByText('JSON downloads'))
+    expect(screen.getByRole('link', { name: 'Download current result (JSON)' })).toHaveProperty('href', expect.stringContaining('view=corrected'))
+    expect(screen.getByRole('link', { name: 'Download original result (JSON)' })).toHaveProperty('href', expect.stringContaining('view=original'))
+  })
+
+  it('compares selected completed documents directly on the documents page', async () => {
+    const { calls } = mockApi({ documents: [row(), row({ id: 45, filename: 'matching.xlsx' })] })
+    const user = userEvent.setup()
+    render(<App />)
+    const first = await screen.findByRole('combobox', { name: 'First document' })
+    const second = screen.getByRole('combobox', { name: 'Second document' })
+    await user.selectOptions(first, '44')
+    await user.selectOptions(second, '45')
+    await user.click(screen.getByRole('button', { name: 'Compare selected' }))
+    expect(await screen.findByText('Matched fields')).toBeTruthy()
+    const request = calls.find((call) => call.url.endsWith('/api/documents/compare'))
+    expect(JSON.parse(String(request?.init?.body))).toEqual({ document_a_id: 44, document_b_id: 45 })
+  })
+
+  it('asks for confirmation and removes a document through the API', async () => {
+    const { calls } = mockApi({ documents: [row()] })
+    const confirmMock = vi.fn(() => true)
+    vi.stubGlobal('confirm', confirmMock)
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: /therapy-invoice.pdf/ }))
+    await user.click(await screen.findByRole('button', { name: 'Remove document' }))
+    expect(confirmMock).toHaveBeenCalled()
+    expect(calls.some((call) => call.url.endsWith('/api/documents/44') && call.init?.method === 'DELETE')).toBe(true)
+    expect(await screen.findByText('therapy-invoice.pdf and its saved results were removed.')).toBeTruthy()
+    expect(await screen.findByText('No invoices added yet.')).toBeTruthy()
   })
 
   it('shows local model proposals, stages reviewer-selected values, and saves them with model provenance', async () => {
@@ -125,13 +163,13 @@ describe('document workspace', () => {
     render(<App />)
     await user.click(await screen.findByRole('button', { name: /therapy-invoice.pdf/ }))
     await user.click(screen.getByText('Optional: AI correction suggestions'))
-    await user.click(await screen.findByRole('button', { name: 'Ask local AI for suggestions' }))
+    await user.click(await screen.findByRole('button', { name: 'Ask AI for suggestions' }))
     expect(await screen.findByText('Total: 120.00')).toBeTruthy()
     await user.click(screen.getByRole('button', { name: 'Use selected suggestions in form' }))
     expect(screen.getByLabelText('Total amount')).toHaveProperty('value', '120.00')
     await user.click(screen.getByRole('button', { name: 'Save review' }))
     const save = calls.find((call) => call.url.endsWith('/api/documents/44/invoice') && call.init?.method === 'PUT')
-    expect(JSON.parse(String(save?.init?.body)).correction_source).toBe('local_model')
+    expect(JSON.parse(String(save?.init?.body)).correction_source).toBe('ai_model')
     expect(JSON.parse(String(save?.init?.body)).correction_model).toBe('local-test-model')
     expect(await screen.findByText('Correction saved. Validation was rerun and the audit history was updated.')).toBeTruthy()
   })

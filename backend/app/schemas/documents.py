@@ -87,7 +87,7 @@ class InvoiceEditLineItem(APIModel):
 class InvoiceEditRequest(APIModel):
     reason: str | None = Field(default=None, max_length=2000)
     corrected_by: str | None = Field(default=None, max_length=255)
-    correction_source: Literal["human", "local_model"] = "human"
+    correction_source: Literal["human", "local_model", "ai_model"] = "human"
     correction_model: str | None = Field(default=None, max_length=127)
     invoice_number: str | None = None
     invoice_date: str | None = None

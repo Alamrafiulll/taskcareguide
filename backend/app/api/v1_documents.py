@@ -3,12 +3,14 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 import json
+import logging
+import mimetypes
 from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
-from fastapi.responses import Response
-from sqlalchemy import and_, func, or_, select
+from fastapi.responses import FileResponse, Response
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -25,11 +27,13 @@ from app.schemas.documents import (DocumentHistoryItem, DocumentMetadata, Docume
                                    RetryResponse)
 from app.schemas.invoice import InvoiceCorrectionSuggestionsRead, InvoiceResultRead
 from app.services.financial_validation import validate_invoice
-from app.services.invoice_extraction import suggest_invoice_corrections
+from app.services.invoice_extraction import active_ai_model, active_ai_provider, suggest_invoice_corrections
 from app.services.ingestion import DocumentIngestionService
 from app.services.semantic_search import EmbeddingUnavailable, semantic_rank
+from app.services.reviewed_invoice_pdf import render_reviewed_invoice_pdf
 
 router = APIRouter(prefix="/api/documents", tags=["documents-v1"])
+logger = logging.getLogger(__name__)
 
 
 def _latest_job_subquery():
@@ -84,7 +88,7 @@ def _filtered_query(*, keyword: str | None = None, status_filter: str | None = N
         raise HTTPException(status_code=422, detail={"code": "invalid_validation_status", "message": "Use has_errors, valid, or pending."})
     ai_corrected = select(ManualCorrection.id).where(
         ManualCorrection.document_id == Document.id,
-        ManualCorrection.correction_source == "local_model").correlate(Document).exists()
+        ManualCorrection.correction_source.in_(["local_model", "ai_model"])).correlate(Document).exists()
     human_corrected = select(ManualCorrection.id).where(
         ManualCorrection.document_id == Document.id,
         ManualCorrection.correction_source == "human").correlate(Document).exists()
@@ -128,7 +132,7 @@ def _summary(document: Document, invoice: InvoiceResult | None, job: ProcessingJ
         validation_status=("has_errors" if error_count else "valid") if invoice else "pending",
         validation_error_count=error_count,
         correction_status=("ai_corrected" if invoice and any(
-            item.correction_source == "local_model" for item in document.corrections) else
+            item.correction_source in {"local_model", "ai_model"} for item in document.corrections) else
             "human_corrected" if invoice and document.corrections else
             "needs_review" if invoice and error_count else "not_needed" if invoice else "pending"),
     )
@@ -212,6 +216,102 @@ def validation_errors(document_id: int, db: Session = Depends(get_db)) -> list[d
              "created_at": item.created_at.isoformat()} for item in result.validation_errors]
 
 
+def _within_storage(root: Path, filename: str) -> Path:
+    if Path(filename).name != filename or filename.startswith((".", "~")):
+        raise HTTPException(status_code=500, detail={"code": "invalid_storage_name",
+            "message": "The stored document name is invalid."})
+    resolved_root = root.resolve()
+    path = (resolved_root / filename).resolve()
+    if path.parent != resolved_root:
+        raise HTTPException(status_code=500, detail={"code": "invalid_storage_path",
+            "message": "The stored document path is invalid."})
+    return path
+
+
+@router.get("/{document_id}/source")
+def download_original_source(document_id: int, db: Session = Depends(get_db)) -> FileResponse:
+    """Download the uploaded file in its original format and bytes."""
+    document = db.get(Document, document_id)
+    if document is None:
+        raise HTTPException(status_code=404, detail={"code": "document_not_found", "message": "Document was not found."})
+    source_path = _within_storage(get_settings().upload_dir, document.stored_filename)
+    if not source_path.is_file():
+        raise HTTPException(status_code=404, detail={"code": "source_not_found", "message": "The original uploaded file is unavailable."})
+    display_name = Path(document.original_filename.replace("\\", "/")).name or f"document-{document_id}"
+    media_type = mimetypes.guess_type(display_name)[0] or "application/octet-stream"
+    return FileResponse(source_path, media_type=media_type, filename=display_name)
+
+
+@router.get("/{document_id}/invoice.pdf")
+def download_reviewed_invoice_pdf(document_id: int, db: Session = Depends(get_db)) -> Response:
+    """Download a newly generated PDF view of the current persisted extraction."""
+    document = db.get(Document, document_id)
+    if document is None:
+        raise HTTPException(status_code=404, detail={"code": "document_not_found", "message": "Document was not found."})
+    invoice = db.scalar(select(InvoiceResult).where(InvoiceResult.document_id == document_id))
+    if invoice is None:
+        raise HTTPException(status_code=409, detail={"code": "result_not_ready", "message": "No reviewed invoice is available yet."})
+    content = render_reviewed_invoice_pdf({
+        "filename": document.original_filename,
+        "invoice_number": invoice.invoice_number,
+        "invoice_date": invoice.invoice_date,
+        "supplier_name": invoice.vendor_name,
+        "customer_name": invoice.customer_name,
+        "currency": invoice.currency,
+        "subtotal": str(invoice.subtotal) if invoice.subtotal is not None else None,
+        "tax_amount": str(invoice.tax_amount) if invoice.tax_amount is not None else None,
+        "total_amount": str(invoice.total_amount) if invoice.total_amount is not None else None,
+        "line_items": [{"description": item.description, "quantity": str(item.quantity) if item.quantity is not None else None,
+                        "unit_price": str(item.unit_price) if item.unit_price is not None else None,
+                        "line_total": str(item.amount) if item.amount is not None else None}
+                       for item in sorted(invoice.line_items, key=lambda item: item.position)],
+        "validation_errors": [{"field_name": item.field_name, "code": item.code, "severity": item.severity,
+                               "message": item.message} for item in invoice.validation_errors],
+    })
+    return Response(content=content, media_type="application/pdf", headers={
+        "Content-Disposition": f'attachment; filename="document-{document_id}-reviewed-invoice.pdf"'})
+
+
+@router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_document(document_id: int, db: Session = Depends(get_db)) -> Response:
+    """Remove a document and its derived records/files; active processing cannot be removed."""
+    document = db.get(Document, document_id)
+    if document is None:
+        raise HTTPException(status_code=404, detail={"code": "document_not_found", "message": "Document was not found."})
+    job = db.scalar(select(ProcessingJob).where(ProcessingJob.document_id == document_id)
+                    .order_by(ProcessingJob.id.desc()).limit(1))
+    if document.status == DocumentStatus.PROCESSING or (job and job.status == JobStatus.RUNNING):
+        raise HTTPException(status_code=409, detail={"code": "document_processing",
+            "message": "Wait for processing to finish before removing this document."})
+    if job and job.status == JobStatus.QUEUED:
+        cancelled = db.execute(update(ProcessingJob).where(
+            ProcessingJob.id == job.id, ProcessingJob.status == JobStatus.QUEUED
+        ).values(status=JobStatus.FAILED, error_details="Removed by the user before processing started.",
+                 permanent_failure=True).execution_options(synchronize_session=False))
+        if cancelled.rowcount != 1:
+            db.rollback()
+            raise HTTPException(status_code=409, detail={"code": "document_processing",
+                "message": "The worker started this document. Wait for processing to finish before removing it."})
+
+    settings = get_settings()
+    source_path = _within_storage(settings.upload_dir, document.stored_filename)
+    stem = Path(document.stored_filename).stem
+    json_path = _within_storage(settings.processed_dir, f"{stem}.json")
+    text_path = _within_storage(settings.processed_dir, f"{stem}.txt")
+    db.delete(document)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    for path in (source_path, json_path, text_path):
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            logger.exception("Could not remove a document file after database deletion", extra={"document_id": document_id})
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("/{document_id}/result")
 def download_result(document_id: int, view: Literal["original", "corrected"] = Query(default="corrected"),
                     db: Session = Depends(get_db)) -> Response:
@@ -260,7 +360,7 @@ def download_result(document_id: int, view: Literal["original", "corrected"] = Q
         corrections = list(db.scalars(select(ManualCorrection).where(
             ManualCorrection.document_id == document_id).order_by(ManualCorrection.created_at, ManualCorrection.id)).all())
         normalized["correction_status"] = "ai_corrected" if any(
-            item.correction_source == "local_model" for item in corrections) else (
+            item.correction_source in {"local_model", "ai_model"} for item in corrections) else (
             "human_corrected" if corrections else "not_corrected")
         normalized["correction_history"] = [{
             "field_name": item.field_name, "previous_value": item.previous_value,
@@ -278,20 +378,21 @@ def download_result(document_id: int, view: Literal["original", "corrected"] = Q
 @router.post("/{document_id}/invoice/ai-suggestions", response_model=InvoiceCorrectionSuggestionsRead)
 def invoice_ai_suggestions(document_id: int, db: Session = Depends(get_db)) -> InvoiceCorrectionSuggestionsRead:
     settings = get_settings()
-    if not settings.ollama_enabled or not settings.ollama_model:
-        raise HTTPException(status_code=503, detail={"code": "local_ai_disabled",
-            "message": "Local AI suggestions are disabled. Configure OLLAMA_ENABLED and OLLAMA_MODEL to use Ollama."})
+    provider = active_ai_provider(settings)
+    if provider is None:
+        raise HTTPException(status_code=503, detail={"code": "ai_disabled",
+            "message": "AI suggestions are disabled. Select Ollama or Gemini and configure its required settings."})
     result = db.scalar(select(InvoiceResult).where(InvoiceResult.document_id == document_id))
     if result is None:
         raise HTTPException(status_code=404, detail={"code": "invoice_not_found", "message": "No invoice extraction exists for this document."})
     raw = result.raw_extraction or {}
     proposals = suggest_invoice_corrections(raw, raw.get("invoice") or {}, settings)
     if proposals is None:
-        raise HTTPException(status_code=503, detail={"code": "local_ai_unavailable",
-            "message": "Ollama did not return valid, evidence-grounded invoice JSON. Existing extracted values were not changed."})
+        raise HTTPException(status_code=503, detail={"code": "ai_unavailable",
+            "message": f"{provider.title()} did not return valid, evidence-grounded invoice JSON. Existing extracted values were not changed."})
     return InvoiceCorrectionSuggestionsRead(document_id=document_id,
         status="suggestions_ready" if proposals["suggestions"] else "no_changes",
-        model=proposals["model"], suggestions=proposals["suggestions"])
+        provider=proposals.get("provider", provider), model=proposals["model"], suggestions=proposals["suggestions"])
 
 
 @router.post("/{document_id}/retry", response_model=RetryResponse, status_code=status.HTTP_202_ACCEPTED)
@@ -374,9 +475,9 @@ def edit_invoice(document_id: int, request: InvoiceEditRequest, db: Session = De
         raw_invoice["line_items"] = after
     raw["invoice"] = raw_invoice
     if audit_entries:
-        if request.correction_source == "local_model":
+        if request.correction_source in {"local_model", "ai_model"}:
             raw["model_correction"] = {
-                "status": "accepted", "model": request.correction_model or get_settings().ollama_model,
+                "status": "accepted", "model": request.correction_model or active_ai_model(get_settings()),
                 "accepted_at": datetime.now(timezone.utc).isoformat(),
                 "fields": [field for field, *_ in audit_entries],
             }
@@ -398,12 +499,13 @@ def edit_invoice(document_id: int, request: InvoiceEditRequest, db: Session = De
         db.add(ManualCorrection(document_id=document_id, field_name=field, previous_value=previous,
             corrected_value=corrected, corrected_by=request.corrected_by, reason=request.reason,
             correction_source=request.correction_source))
-    event_type = "ai_suggestions_accepted" if request.correction_source == "local_model" else "invoice_corrected"
+    is_ai_correction = request.correction_source in {"local_model", "ai_model"}
+    event_type = "ai_suggestions_accepted" if is_ai_correction else "invoice_corrected"
     db.add(ProcessingHistory(document_id=document_id, event_type=event_type, status="reviewed",
         details=request.reason or "Invoice fields were corrected.",
         event_data={"fields": sorted(field for field, *_ in audit_entries),
                     "correction_source": request.correction_source,
-                    "model": request.correction_model if request.correction_source == "local_model" else None}))
+                    "model": request.correction_model if is_ai_correction else None}))
     db.commit()
     db.refresh(result)
     payload = InvoiceResultRead.model_validate(result)

@@ -1,7 +1,7 @@
 import { ChangeEvent, DragEvent, FormEvent, useCallback, useEffect, useState } from 'react'
 import { API_BASE, api, AISuggestionResponse, CorrectionEvent, DocumentSummary, HistoryEvent, Invoice, InvoiceLine, Page, ValidationFinding } from './api'
 
-type View = 'documents' | 'search' | 'compare'
+type View = 'documents' | 'search'
 type Readiness = { status: string; checks: Record<string, string> }
 type UploadItem = { document_id?: number | null; filename: string; status: string; error?: { code?: string; message?: string } | null; duplicate_of_document_id?: number | null }
 type CompareReport = { comparable: boolean; review_recommended: boolean; matched_fields: Array<Record<string, unknown>>; mismatched_fields: Array<Record<string, unknown>>; missing_fields: Array<Record<string, unknown>>; reasons: string[] }
@@ -65,7 +65,7 @@ export default function App() {
   const [edit, setEdit] = useState<Record<string, string>>({})
   const [lineItems, setLineItems] = useState<InvoiceLine[]>([])
   const [reason, setReason] = useState('')
-  const [correctionSource, setCorrectionSource] = useState<'human' | 'local_model'>('human')
+  const [correctionSource, setCorrectionSource] = useState<'human' | 'ai_model'>('human')
   const [aiSuggestions, setAiSuggestions] = useState<AISuggestionResponse | null>(null)
   const [selectedSuggestions, setSelectedSuggestions] = useState<string[]>([])
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
@@ -80,6 +80,7 @@ export default function App() {
   const [compareDocuments, setCompareDocuments] = useState<DocumentSummary[]>([])
   const [comparison, setComparison] = useState<CompareReport | null>(null)
   const [comparing, setComparing] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const loadDocuments = useCallback(async (currentPage = page, filters = appliedFilters) => {
     const params = new URLSearchParams({ page: String(currentPage), page_size: String(pageSize) })
@@ -135,10 +136,10 @@ export default function App() {
   }, [refresh, selectedId, loadDetail])
 
   useEffect(() => {
-    if (view !== 'compare') return
+    if (view !== 'documents') return
     const params = new URLSearchParams({ page: '1', page_size: '100', status: 'completed' })
     void api<Page<DocumentSummary>>(`/documents?${params}`).then((result) => setCompareDocuments(result.items)).catch((cause) => setError(errorText(cause)))
-  }, [view])
+  }, [view, documents?.total, documents?.items.map((item) => `${item.id}:${item.status}`).join('|')])
 
   useEffect(() => {
     if (selectedId !== null) void loadDetail(selectedId)
@@ -221,9 +222,9 @@ export default function App() {
     setSaving(true); setError(''); setNotice('')
     const payload: Record<string, unknown> = {
       reason: reason || null,
-      corrected_by: correctionSource === 'local_model' ? 'Reviewer accepted local model suggestion' : 'Local reviewer',
+      corrected_by: correctionSource === 'ai_model' ? 'Reviewer accepted AI suggestion' : 'Local reviewer',
       correction_source: correctionSource,
-      correction_model: correctionSource === 'local_model' ? aiSuggestions?.model : null,
+      correction_model: correctionSource === 'ai_model' ? aiSuggestions?.model : null,
     }
     for (const key of ['invoice_number', 'invoice_date', 'supplier_name', 'customer_name', 'currency']) payload[key] = edit[key] || null
     for (const key of ['subtotal', 'tax_amount', 'total_amount']) payload[key] = edit[key] === '' ? null : edit[key]
@@ -246,7 +247,7 @@ export default function App() {
       const result = await api<AISuggestionResponse>(`/documents/${selectedId}/invoice/ai-suggestions`, { method: 'POST' })
       setAiSuggestions(result)
       setSelectedSuggestions(result.suggestions.map((item) => item.field))
-      setNotice(result.status === 'no_changes' ? 'The local model found no evidence-grounded changes for fields flagged for review.' : `The local model proposed ${result.suggestions.length} evidence-grounded field changes. Review and choose before saving.`)
+      setNotice(result.status === 'no_changes' ? `The ${result.provider} model found no evidence-grounded changes for fields flagged for review.` : `The ${result.provider} model proposed ${result.suggestions.length} evidence-grounded field changes. Review and choose before saving.`)
     } catch (cause) { setError(errorText(cause)) }
     finally { setLoadingSuggestions(false) }
   }
@@ -271,7 +272,7 @@ export default function App() {
         amount: item.line_total == null ? null : String(item.line_total),
       })))
     }
-    setCorrectionSource('local_model')
+    setCorrectionSource('ai_model')
     setReason(`Reviewed and accepted suggestions from ${aiSuggestions.model}`)
     setNotice('Selected values are staged in the correction form. Save them to update the stored result and audit history.')
   }
@@ -285,6 +286,20 @@ export default function App() {
       await loadDocuments()
       await loadDetail(selectedId)
     } catch (cause) { setError(errorText(cause)) }
+  }
+
+  async function removeDocument() {
+    if (!selectedId || !metadata) return
+    if (!window.confirm(`Remove ${metadata.filename} and its saved results? This cannot be undone.`)) return
+    setDeleting(true); setError(''); setNotice('')
+    try {
+      await api<void>(`/documents/${selectedId}`, { method: 'DELETE' })
+      const removedName = metadata.filename
+      setSelectedId(null)
+      await loadDocuments()
+      setNotice(`${removedName} and its saved results were removed.`)
+    } catch (cause) { setError(errorText(cause)) }
+    finally { setDeleting(false) }
   }
 
   async function runSearch(event: FormEvent) {
@@ -328,17 +343,12 @@ export default function App() {
 
   return <div className="app-shell">
     <header className="topbar">
-      <a className="brand" href="#documents" onClick={() => setView('documents')}><span className="brand-mark">cg</span><span>Care Guide<small>DOCUMENT INTELLIGENCE</small></span></a>
+      <a className="brand" href="#documents" onClick={() => setView('documents')}><span className="brand-mark">ii</span><span>Invoice Insight<small>DOCUMENT INTELLIGENCE</small></span></a>
       <nav className="main-nav" aria-label="Workspace">
         <button className={view === 'documents' && !appliedFilters.correction_status ? 'active' : ''} onClick={() => { setView('documents'); setFilterForm({ ...filterForm, correction_status: '' }); setAppliedFilters({ ...appliedFilters, correction_status: '' }) }}>Documents</button>
         <button className={appliedFilters.correction_status === 'needs_review' ? 'active' : ''} onClick={() => openCorrectionView('needs_review')}>Needs review</button>
-        <details className="nav-tools">
-          <summary className={view === 'search' || view === 'compare' ? 'active' : ''}>More tools</summary>
-          <div className="nav-tools-menu">
-            <button className={view === 'search' ? 'active' : ''} onClick={() => setView('search')}>Search documents</button>
-            <button className={view === 'compare' ? 'active' : ''} onClick={() => setView('compare')}>Compare invoices</button>
-          </div>
-        </details>
+        <button onClick={() => { setView('documents'); window.setTimeout(() => document.getElementById('comparison-section')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }), 50) }}>Compare</button>
+        <button className={view === 'search' ? 'active' : ''} onClick={() => setView('search')}>Find documents</button>
       </nav>
       <div className="connection" aria-label="Backend readiness"><span className={`status-dot ${readiness?.checks.database === 'ok' ? 'online' : 'offline'}`} /><span>{readiness?.checks.database === 'ok' ? 'App connected' : 'App not connected'}</span><span className="worker-badge">Processing {readiness?.checks.worker === 'ok' ? 'ready' : 'stopped'}</span></div>
     </header>
@@ -392,9 +402,20 @@ export default function App() {
             <div className="pagination"><span>{documents.total ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, documents.total)} of ${documents.total}` : 'No results'}</span><div><button className="button button-quiet" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</button><span>Page {page} of {pageCount}</span><button className="button button-quiet" disabled={page >= pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>Next</button></div></div>
           </> : <div className="empty-state"><strong>{Object.values(appliedFilters).some(Boolean) ? 'No invoices match those filters.' : 'No invoices added yet.'}</strong><span>{Object.values(appliedFilters).some(Boolean) ? 'Try changing or clearing the filters above.' : 'Add an invoice above to begin. Your results will appear here.'}</span></div>}
         </section>
+        <section id="comparison-section" className="documents-section comparison-inline" aria-labelledby="comparison-heading">
+          <div className="section-title"><div><p className="eyebrow">CROSS-CHECK</p><h2 id="comparison-heading">Compare two invoices</h2><p className="section-hint">Choose two completed documents. Results appear here on the same page.</p></div></div>
+          {compareDocuments.length >= 2 ? <>
+            <form className="tool-form compare-form" onSubmit={runComparison}>
+              <label>First document<select aria-label="First document" value={compareA} onChange={(e) => setCompareA(e.target.value)} required><option value="">Select document</option>{compareDocuments.map((doc) => <option value={doc.id} key={doc.id}>#{doc.id} · {doc.filename}</option>)}</select></label>
+              <label>Second document<select aria-label="Second document" value={compareB} onChange={(e) => setCompareB(e.target.value)} required><option value="">Select document</option>{compareDocuments.map((doc) => <option value={doc.id} key={doc.id}>#{doc.id} · {doc.filename}</option>)}</select></label>
+              <button className="button button-primary" disabled={comparing || !compareA || !compareB || compareA === compareB}>{comparing ? 'Comparing…' : 'Compare selected'}</button>
+            </form>
+            {comparison && <ComparisonReport report={comparison} />}
+          </> : <div className="empty-state"><strong>Add two completed invoices to compare.</strong><span>PDF, spreadsheet, and CSV results can be compared when invoice identity supports it.</span></div>}
+        </section>
         {selectedId !== null && <section id="detail-section" className="detail-section" aria-labelledby="detail-heading">
           {loadingDetail ? <div className="empty-state">Loading document details…</div> : metadata && <>
-            <div className="detail-header"><div><p className="eyebrow">STEP 3 · REVIEW</p><h2 id="detail-heading">{metadata.filename}</h2><p className="subheading">{metadata.status === 'completed' ? 'Check the information below. You can leave correct fields as they are.' : metadata.status === 'failed' ? 'Processing stopped. Check the message and try again if available.' : 'Your document is being processed. This panel will update automatically.'}</p></div><div className="detail-actions"><span className={`status-tag status-${metadata.status}`}>{metadata.status === 'completed' ? 'Ready to review' : metadata.status}</span>{metadata.status === 'failed' && <button className="button button-secondary" onClick={() => void retryDocument()} disabled={metadata.job?.permanent_failure}>Try again</button>}{invoice && <><a className="button button-primary" href={`${API_BASE}/api/documents/${metadata.id}/result?view=corrected`} target="_blank" rel="noreferrer">Download reviewed result</a><details className="download-options"><summary>Other downloads</summary><a href={`${API_BASE}/api/documents/${metadata.id}/result?view=original`} target="_blank" rel="noreferrer">Download original JSON</a></details></>}<button type="button" className="button button-quiet" onClick={() => setSelectedId(null)}>Back to list</button></div></div>
+            <div className="detail-header"><div><p className="eyebrow">STEP 3 · REVIEW</p><h2 id="detail-heading">{metadata.filename}</h2><p className="subheading">{metadata.status === 'completed' ? 'Check the information below. You can leave correct fields as they are.' : metadata.status === 'failed' ? 'Processing stopped. Check the message and try again if available.' : 'Your document is being processed. This panel will update automatically.'}</p></div><div className="detail-actions"><span className={`status-tag status-${metadata.status}`}>{metadata.status === 'completed' ? 'Ready to review' : metadata.status}</span>{metadata.status === 'failed' && <button className="button button-secondary" onClick={() => void retryDocument()} disabled={metadata.job?.permanent_failure}>Try again</button>}{invoice && <div className="download-actions"><a className="button button-primary" href={`${API_BASE}/api/documents/${metadata.id}/invoice.pdf`}>Download reviewed invoice (PDF)</a><a className="button button-secondary" href={`${API_BASE}/api/documents/${metadata.id}/source`}>Download original file</a><details className="download-options"><summary>JSON downloads</summary><a href={`${API_BASE}/api/documents/${metadata.id}/result?view=corrected`}>Download current result (JSON)</a><a href={`${API_BASE}/api/documents/${metadata.id}/result?view=original`}>Download original result (JSON)</a></details><small className="download-hint">The reviewed PDF reflects saved fields. The original file stays unchanged.</small></div>}<button type="button" className="button button-danger" onClick={() => void removeDocument()} disabled={deleting || metadata.status === 'processing'}>{deleting ? 'Removing…' : 'Remove document'}</button><button type="button" className="button button-quiet" onClick={() => setSelectedId(null)}>Back to list</button></div></div>
             {metadata.status === 'processing' && <div className="progress-note" role="status">{processingEvent ? `${processingEvent.details ?? 'Processing'}${processingEvent.event_data?.completed && processingEvent.event_data?.total ? ` · ${processingEvent.event_data.completed} of ${processingEvent.event_data.total}` : ''}` : 'The worker is processing this document.'} · updated from saved processing history</div>}
             {metadata.error_details && <div className="finding finding-error processing-issue"><strong>This document needs attention</strong><span>{friendlyProcessingError(metadata.error_details)}</span></div>}
             <div className="review-grid">
@@ -429,8 +450,8 @@ export default function App() {
                   {invoice?.field_confidence && <div className="confidence-note">Field quality indicators are heuristic, not calibrated probabilities. {Object.entries(invoice.field_confidence).map(([key, value]) => value !== null && value < 0.7 ? <span className="review-tag needs-review" key={key}>{key.replace(/_/g, ' ')} · low quality</span> : null)}</div>}
                 </div>
                 <details className="card optional-panel"><summary>Optional: AI correction suggestions</summary><p className="help-text">AI suggestions are optional. Review each suggestion and its evidence before saving it.</p>
-                  {readiness?.checks.local_ai === 'enabled' ? <button className="button button-secondary" onClick={() => void requestAISuggestions()} disabled={loadingSuggestions}>{loadingSuggestions ? 'Checking the document…' : 'Ask local AI for suggestions'}</button> : <p className="muted">Local AI is off. You can still review and correct the invoice yourself.</p>}
-                  {aiSuggestions && <div className="suggestion-review" aria-label="Model correction suggestions"><p className="model-caption">Model: {aiSuggestions.model}. Suggestions are evidence-grounded proposals and are not saved until you stage and save them.</p>
+                  {(readiness?.checks.ai_assistant ?? readiness?.checks.local_ai) === 'enabled' ? <button className="button button-secondary" onClick={() => void requestAISuggestions()} disabled={loadingSuggestions}>{loadingSuggestions ? 'Checking the document…' : 'Ask AI for suggestions'}</button> : <p className="muted">AI suggestions are off. Configure Ollama or Gemini in the backend settings. You can still review and correct the invoice yourself.</p>}
+                  {aiSuggestions && <div className="suggestion-review" aria-label="Model correction suggestions"><p className="model-caption">Provider: {aiSuggestions.provider} · model: {aiSuggestions.model}. Suggestions are evidence-grounded proposals and are not saved until you stage and save them.</p>
                     {aiSuggestions.suggestions.length ? <ul className="suggestion-list">{aiSuggestions.suggestions.map((item) => <li key={item.field}><label className="suggestion-select"><input type="checkbox" checked={selectedSuggestions.includes(item.field)} onChange={(event) => setSelectedSuggestions((selected) => event.target.checked ? [...selected, item.field] : selected.filter((field) => field !== item.field))} /><strong>{item.field.replace(/_/g, ' ')}</strong></label><div className="suggestion-values"><span><small>Current</small><code>{readableValue(item.current_value)}</code></span><span><small>Model suggests</small><code>{readableValue(item.suggested_value)}</code></span></div><small>Source evidence</small>{item.evidence.map((snippet, index) => <blockquote key={`${item.field}-${index}`}>{snippet}</blockquote>)}</li>)}</ul> : <p className="muted">The model found no changes it could support from the source.</p>}
                     {aiSuggestions.suggestions.length > 0 && <button type="button" className="button button-primary" disabled={!selectedSuggestions.length} onClick={stageSelectedSuggestions}>Use selected suggestions in form</button>}
                   </div>}
@@ -449,22 +470,18 @@ export default function App() {
         </section>}
       </>}
 
-      {view === 'search' && <section className="tool-page"><div className="page-heading"><div><p className="eyebrow">FIND STORED RESULTS</p><h1>Search documents</h1><p className="subheading">Keyword search works offline. Semantic search requires the optional local model.</p></div></div>
-        <form className="tool-form" onSubmit={runSearch}><label>Search query<input autoFocus value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Invoice number, supplier, or phrase" required /></label><label>Search mode<select value={searchMode} onChange={(e) => setSearchMode(e.target.value)}><option value="keyword">Keyword</option><option value="semantic">Semantic (local model)</option><option value="hybrid">Hybrid</option></select></label><button className="button button-primary" disabled={searching || !searchQuery.trim()}>{searching ? 'Searching…' : 'Search'}</button></form>
+      {view === 'search' && <section className="tool-page"><div className="page-heading"><div><p className="eyebrow">FIND STORED RESULTS</p><h1>Find documents</h1><p className="subheading">Search processed documents by invoice details or words found in them. Keyword finds matching words offline; Semantic finds similar meaning with a separate local search model; Hybrid combines both. Results show document details—open one to inspect its extracted invoice and checks.</p></div></div>
+        <form className="tool-form" onSubmit={runSearch}><label>Search query<input autoFocus value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Invoice number, supplier, customer, or document words" required /></label><label>Search mode<select value={searchMode} onChange={(e) => setSearchMode(e.target.value)}><option value="keyword">Keyword (matching words)</option><option value="semantic">Semantic (similar meaning)</option><option value="hybrid">Hybrid (both)</option></select></label><button className="button button-primary" disabled={searching || !searchQuery.trim()}>{searching ? 'Searching…' : 'Search'}</button></form>
         <DocumentResultTable rows={searchResults} onSelect={(id) => { selectDocument(id); setView('documents') }} scores={searchScores} empty={!searching} />
       </section>}
 
-      {view === 'compare' && <section className="tool-page"><div className="page-heading"><div><p className="eyebrow">CROSS-DOCUMENT CHECK</p><h1>Compare invoices</h1><p className="subheading">Choose two processed documents. The comparison uses stored extraction results.</p></div></div>
-        <form className="tool-form compare-form" onSubmit={runComparison}><label>First document<select value={compareA} onChange={(e) => setCompareA(e.target.value)} required><option value="">Select document</option>{compareDocuments.map((doc) => <option value={doc.id} key={doc.id}>#{doc.id} · {doc.filename}</option>)}</select></label><label>Second document<select value={compareB} onChange={(e) => setCompareB(e.target.value)} required><option value="">Select document</option>{compareDocuments.map((doc) => <option value={doc.id} key={doc.id}>#{doc.id} · {doc.filename}</option>)}</select></label><button className="button button-primary" disabled={comparing || !compareA || !compareB || compareA === compareB}>{comparing ? 'Comparing…' : 'Compare selected'}</button></form>
-        {comparison && <ComparisonReport report={comparison} />}
-      </section>}
     </main>
-    <footer className="footer"><span>Care Guide · Local document intelligence</span><span>Original documents remain unchanged</span></footer>
+    <footer className="footer"><span>Invoice Insight · Local document intelligence</span><span>Original documents remain unchanged</span></footer>
   </div>
 }
 
 function DocumentResultTable({ rows, onSelect, scores, empty }: { rows: DocumentSummary[]; onSelect: (id: number) => void; scores?: Record<number, number | null>; empty: boolean }) {
-  if (!rows.length) return empty ? <div className="empty-state"><strong>No matching documents.</strong><span>Search results include stored document metadata only.</span></div> : null
+  if (!rows.length) return empty ? <div className="empty-state"><strong>No matching documents.</strong><span>Matches show document details only; they don’t include the original file or full extracted text.</span></div> : null
   return <div className="table-wrap results-wrap"><table className="document-table"><thead><tr><th>Document</th><th>Invoice</th><th>Supplier</th><th>Status</th><th>Score</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td><button className="document-link" onClick={() => onSelect(row.id)}>{row.filename}<small>Document #{row.id}</small></button></td><td>{row.invoice_number || '—'}</td><td>{row.supplier_name || '—'}</td><td><span className={`status-tag status-${row.status}`}>{row.status}</span></td><td>{scores?.[row.id] == null ? '—' : scores[row.id]?.toFixed(3)}</td></tr>)}</tbody></table></div>
 }
 

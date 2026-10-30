@@ -1,0 +1,434 @@
+{
+  "dataset_name": "Care Guide local UI demo samples",
+  "synthetic_only": true,
+  "normalization": "Dates are ISO YYYY-MM-DD; money values are exact decimal strings.",
+  "comparison_pairs": {
+    "matching": [
+      "01_valid_invoice.pdf",
+      "02_matching_invoice.xlsx"
+    ],
+    "mismatch": [
+      "01_valid_invoice.pdf",
+      "03_mismatch_same_invoice.csv"
+    ]
+  },
+  "documents": [
+    {
+      "file": "01_valid_invoice.pdf",
+      "expected_invoice": {
+        "invoice_number": "CG-DEMO-1001",
+        "invoice_date": "2026-05-10",
+        "supplier_name": "North Clinic",
+        "customer_name": "Care Guide",
+        "subtotal": "100.00",
+        "tax_amount": "10.00",
+        "total_amount": "110.00",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Care visit",
+            "quantity": "2",
+            "unit_price": "50.00",
+            "line_total": "100.00"
+          },
+          {
+            "description": "Diagnostic kit",
+            "quantity": "1",
+            "unit_price": "0.00",
+            "line_total": "0.00"
+          }
+        ]
+      },
+      "expected_validation_codes": []
+    },
+    {
+      "file": "02_matching_invoice.xlsx",
+      "expected_invoice": {
+        "invoice_number": "CG-DEMO-1001",
+        "invoice_date": "2026-05-10",
+        "supplier_name": "North Clinic",
+        "customer_name": "Care Guide",
+        "subtotal": "100.00",
+        "tax_amount": "10.00",
+        "total_amount": "110.00",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Care visit",
+            "quantity": "2",
+            "unit_price": "50.00",
+            "line_total": "100.00"
+          },
+          {
+            "description": "Diagnostic kit",
+            "quantity": "1",
+            "unit_price": "0.00",
+            "line_total": "0.00"
+          }
+        ]
+      },
+      "expected_validation_codes": [
+        "duplicate_invoice"
+      ]
+    },
+    {
+      "file": "03_mismatch_same_invoice.csv",
+      "expected_invoice": {
+        "invoice_number": "CG-DEMO-1001",
+        "invoice_date": "2026-05-10",
+        "supplier_name": "North Clinic",
+        "customer_name": "Care Guide",
+        "subtotal": "100.00",
+        "tax_amount": "10.00",
+        "total_amount": "111.00",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Care visit",
+            "quantity": "2",
+            "unit_price": "50.00",
+            "line_total": "100.00"
+          },
+          {
+            "description": "Diagnostic kit",
+            "quantity": "1",
+            "unit_price": "0.00",
+            "line_total": "0.00"
+          }
+        ]
+      },
+      "expected_validation_codes": [
+        "duplicate_invoice",
+        "subtotal_tax_total_mismatch"
+      ]
+    },
+    {
+      "file": "04_duplicate_invoice.csv",
+      "expected_invoice": {
+        "invoice_number": "CG-DEMO-1001",
+        "invoice_date": "2026-05-10",
+        "supplier_name": "North Clinic",
+        "customer_name": "Care Guide",
+        "subtotal": "100.00",
+        "tax_amount": "10.00",
+        "total_amount": "110.00",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Care visit",
+            "quantity": "2",
+            "unit_price": "50.00",
+            "line_total": "100.00"
+          },
+          {
+            "description": "Diagnostic kit",
+            "quantity": "1",
+            "unit_price": "0.00",
+            "line_total": "0.00"
+          }
+        ]
+      },
+      "expected_validation_codes": [
+        "duplicate_invoice"
+      ]
+    },
+    {
+      "file": "05_missing_invoice_number.csv",
+      "expected_invoice": {
+        "invoice_number": null,
+        "invoice_date": "2026-05-10",
+        "supplier_name": "North Clinic",
+        "customer_name": "Care Guide",
+        "subtotal": "100.00",
+        "tax_amount": "10.00",
+        "total_amount": "110.00",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Care visit",
+            "quantity": "2",
+            "unit_price": "50.00",
+            "line_total": "100.00"
+          },
+          {
+            "description": "Diagnostic kit",
+            "quantity": "1",
+            "unit_price": "0.00",
+            "line_total": "0.00"
+          }
+        ]
+      },
+      "expected_validation_codes": [
+        "required_field_missing"
+      ]
+    },
+    {
+      "file": "06_missing_tax.csv",
+      "expected_invoice": {
+        "invoice_number": "CG-DEMO-1005",
+        "invoice_date": "2026-05-10",
+        "supplier_name": "North Clinic",
+        "customer_name": "Care Guide",
+        "subtotal": "100.00",
+        "tax_amount": null,
+        "total_amount": "100.00",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Care visit",
+            "quantity": "2",
+            "unit_price": "50.00",
+            "line_total": "100.00"
+          },
+          {
+            "description": "Diagnostic kit",
+            "quantity": "1",
+            "unit_price": "0.00",
+            "line_total": "0.00"
+          }
+        ]
+      },
+      "expected_validation_codes": [
+        "field_missing"
+      ]
+    },
+    {
+      "file": "07_incorrect_total.pdf",
+      "expected_invoice": {
+        "invoice_number": "CG-DEMO-1002",
+        "invoice_date": "2026-05-10",
+        "supplier_name": "North Clinic",
+        "customer_name": "Care Guide",
+        "subtotal": "120.00",
+        "tax_amount": "12.00",
+        "total_amount": "139.00",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Lab panel",
+            "quantity": "2",
+            "unit_price": "60.00",
+            "line_total": "120.00"
+          }
+        ]
+      },
+      "expected_validation_codes": [
+        "subtotal_tax_total_mismatch"
+      ]
+    },
+    {
+      "file": "08_line_item_error.xlsx",
+      "expected_invoice": {
+        "invoice_number": "CG-DEMO-1003",
+        "invoice_date": "2026-05-10",
+        "supplier_name": "North Clinic",
+        "customer_name": "Care Guide",
+        "subtotal": "100.00",
+        "tax_amount": "10.00",
+        "total_amount": "110.00",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Care service",
+            "quantity": "2",
+            "unit_price": "45.00",
+            "line_total": "100.00"
+          },
+          {
+            "description": "Equipment",
+            "quantity": "1",
+            "unit_price": "0.00",
+            "line_total": "5.00"
+          }
+        ]
+      },
+      "expected_validation_codes": [
+        "line_item_multiplication_mismatch",
+        "line_items_subtotal_mismatch"
+      ]
+    },
+    {
+      "file": "09_uncertain_value.png",
+      "expected_invoice": {
+        "invoice_number": null,
+        "invoice_date": "2026-05-10",
+        "supplier_name": "North Clinic",
+        "customer_name": "Care Guide",
+        "subtotal": "100.00",
+        "tax_amount": "10.00",
+        "total_amount": "110.00",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Care visit",
+            "quantity": "2",
+            "unit_price": "50.00",
+            "line_total": "100.00"
+          },
+          {
+            "description": "Diagnostic kit",
+            "quantity": "1",
+            "unit_price": "0.00",
+            "line_total": "0.00"
+          }
+        ]
+      },
+      "unreadable_fields": [
+        "invoice_number"
+      ],
+      "requires_ocr": true
+    },
+    {
+      "file": "10_scanned_invoice.jpg",
+      "expected_invoice": {
+        "invoice_number": "CG-DEMO-1004",
+        "invoice_date": "2026-05-10",
+        "supplier_name": "North Clinic",
+        "customer_name": "Care Guide",
+        "subtotal": "100.00",
+        "tax_amount": "10.00",
+        "total_amount": "110.00",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Scanned consultation",
+            "quantity": "2",
+            "unit_price": "50.00",
+            "line_total": "100.00"
+          }
+        ]
+      },
+      "requires_ocr": true
+    },
+    {
+      "file": "11_scanned_invoice.pdf",
+      "expected_invoice": {
+        "invoice_number": "CG-DEMO-1004",
+        "invoice_date": "2026-05-10",
+        "supplier_name": "North Clinic",
+        "customer_name": "Care Guide",
+        "subtotal": "100.00",
+        "tax_amount": "10.00",
+        "total_amount": "110.00",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Scanned consultation",
+            "quantity": "2",
+            "unit_price": "50.00",
+            "line_total": "100.00"
+          }
+        ]
+      },
+      "requires_ocr": true
+    },
+    {
+      "file": "12_scanned_invoice.png",
+      "expected_invoice": {
+        "invoice_number": "CG-DEMO-1004",
+        "invoice_date": "2026-05-10",
+        "supplier_name": "North Clinic",
+        "customer_name": "Care Guide",
+        "subtotal": "100.00",
+        "tax_amount": "10.00",
+        "total_amount": "110.00",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Scanned consultation",
+            "quantity": "2",
+            "unit_price": "50.00",
+            "line_total": "100.00"
+          }
+        ]
+      },
+      "requires_ocr": true
+    },
+    {
+      "file": "13_multipage_invoice.tiff",
+      "expected_invoice": {
+        "invoice_number": "CG-DEMO-1004",
+        "invoice_date": "2026-05-10",
+        "supplier_name": "North Clinic",
+        "customer_name": "Care Guide",
+        "subtotal": "100.00",
+        "tax_amount": "10.00",
+        "total_amount": "110.00",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Scanned consultation",
+            "quantity": "2",
+            "unit_price": "50.00",
+            "line_total": "100.00"
+          },
+          {
+            "description": "Diagnostic kit",
+            "quantity": "1",
+            "unit_price": "0.00",
+            "line_total": "0.00"
+          }
+        ]
+      },
+      "page_count": 2,
+      "requires_ocr": true
+    },
+    {
+      "file": "14_legacy_invoice.xls",
+      "expected_invoice": {
+        "invoice_number": "CG-DEMO-1001",
+        "invoice_date": "2026-05-10",
+        "supplier_name": "North Clinic",
+        "customer_name": "Care Guide",
+        "subtotal": "100.00",
+        "tax_amount": "10.00",
+        "total_amount": "110.00",
+        "currency": "USD",
+        "line_items": [
+          {
+            "description": "Care visit",
+            "quantity": "2",
+            "unit_price": "50.00",
+            "line_total": "100.00"
+          },
+          {
+            "description": "Diagnostic kit",
+            "quantity": "1",
+            "unit_price": "0.00",
+            "line_total": "0.00"
+          }
+        ]
+      },
+      "expected_worksheets": [
+        "Invoice",
+        "Line Items"
+      ]
+    },
+    {
+      "file": "15_malformed_rows.csv",
+      "expected_processing_status": "completed_with_errors"
+    },
+    {
+      "file": "16_empty.csv",
+      "expected_upload_status": "rejected",
+      "expected_error": "empty_file"
+    },
+    {
+      "file": "17_corrupted.pdf",
+      "expected_processing_status": "failed"
+    },
+    {
+      "file": "18_unsupported.txt",
+      "expected_upload_status": "rejected",
+      "expected_error": "unsupported_format"
+    },
+    {
+      "file": "optional/optional_1001_page_limit.pdf",
+      "page_count": 1001,
+      "expected_processed_pages": 1000,
+      "expected_warning": "page_limit_reached"
+    }
+  ],
+  "retry_note": "A source fixture cannot reliably produce a transient worker failure. The corrupt PDF is permanently invalid and should not be retryable. Use the automated worker tests for transient retry behavior.",
+  "optional_features": "Ollama suggestions and semantic search need optional local models; their absence does not prevent ordinary upload, extraction, review, keyword search, or comparisons."
+}

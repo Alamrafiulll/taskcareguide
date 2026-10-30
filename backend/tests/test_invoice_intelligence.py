@@ -187,6 +187,89 @@ def test_ollama_malformed_response_retries_are_bounded(monkeypatch):
     assert len(calls) == extraction.RETRY_LIMIT == 2
 
 
+def test_gemini_response_is_schema_validated_and_key_stays_in_header(monkeypatch):
+    import app.services.invoice_extraction as extraction
+
+    evidence = normalized()
+    extracted = extract_invoice(evidence)
+    candidate_payload = {field: extracted[field] for field in extraction.InvoiceExtraction.model_fields}
+    response_body = {"candidates": [{"content": {"parts": [{"text": json.dumps(candidate_payload)}]}}]}
+
+    class Response:
+        def __enter__(self):
+            return self
+        def __exit__(self, *_args):
+            return False
+        def read(self):
+            return json.dumps(response_body).encode()
+
+    requests = []
+    def fake_urlopen(request, timeout):
+        requests.append((request, timeout))
+        return Response()
+
+    monkeypatch.setattr(extraction.urllib.request, "urlopen", fake_urlopen)
+    settings = Settings(_env_file=None, ai_provider="gemini", gemini_api_key="test-key",
+                        gemini_model="gemini-test-model", gemini_timeout_seconds=12)
+    source_text = "\n".join(s["text"] for s in extraction._segments_evidence(evidence))
+    result = extraction._gemini_extract(settings, source_text)
+    assert result is not None and result.invoice_number == "CG-1001"
+    request, timeout = requests[0]
+    assert timeout == 12
+    assert "test-key" not in request.full_url
+    assert request.get_header("X-goog-api-key") == "test-key"
+
+
+def test_gemini_malformed_response_retries_are_bounded(monkeypatch):
+    import app.services.invoice_extraction as extraction
+
+    class Response:
+        def __enter__(self):
+            return self
+        def __exit__(self, *_args):
+            return False
+        def read(self):
+            return b'{"candidates":[{"content":{"parts":[{"text":"not-json"}]}}]}'
+
+    calls = []
+    def malformed(*_args, **_kwargs):
+        calls.append(1)
+        return Response()
+
+    monkeypatch.setattr(extraction.urllib.request, "urlopen", malformed)
+    settings = Settings(_env_file=None, ai_provider="gemini", gemini_api_key="test-key")
+    assert extraction._gemini_extract(settings, "Invoice Number: CG-1001") is None
+    assert len(calls) == extraction.RETRY_LIMIT == 2
+
+
+def test_gemini_mode_records_provider_and_keeps_deterministic_values(monkeypatch):
+    import app.services.invoice_extraction as extraction
+
+    settings = Settings(_env_file=None, ai_provider="gemini", gemini_api_key="test-key",
+                        gemini_model="gemini-test-model")
+    candidate = extraction.InvoiceExtraction.model_validate({
+        field: extract_invoice(normalized())[field] for field in extraction.InvoiceExtraction.model_fields
+    })
+    monkeypatch.setattr(extraction, "_gemini_extract", lambda *_: candidate)
+    result = extract_invoice(normalized(), settings)
+    assert result["extraction_method"] == "deterministic+gemini"
+    assert result["extraction_metadata"]["ai_provider"] == "gemini"
+    assert result["extraction_metadata"]["ai_model"] == "gemini-test-model"
+    assert result["invoice_number"] == "CG-1001"
+
+
+def test_ai_provider_requires_explicit_configuration_and_never_falls_back_silently(monkeypatch):
+    import app.services.invoice_extraction as extraction
+
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    assert extraction.active_ai_provider(Settings(_env_file=None, ai_provider="gemini")) is None
+    configured_gemini = Settings(_env_file=None, ai_provider="gemini", gemini_api_key="test-key",
+                                 ollama_enabled=True, ollama_model="local-model")
+    assert extraction.active_ai_provider(configured_gemini) == "gemini"
+    legacy_local = Settings(_env_file=None, ollama_enabled=True, ollama_model="local-model")
+    assert extraction.active_ai_provider(legacy_local) == "ollama"
+
+
 def test_ingestion_persists_invoice_validation_and_comparison_with_pdf_and_xlsx(tmp_path):
     fitz = pytest.importorskip("fitz", reason="PyMuPDF is required for PDF fixture")
     pd = pytest.importorskip("pandas", reason="pandas is required for XLSX fixture")

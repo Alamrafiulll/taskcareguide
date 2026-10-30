@@ -1,15 +1,16 @@
 from functools import lru_cache
 from decimal import Decimal
 from pathlib import Path
+from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 
 
 class Settings(BaseSettings):
-    app_name: str = "Care Guide Document Intelligence API"
+    app_name: str = "Invoice Insight Document Intelligence API"
     environment: str = "development"
     log_level: str = "INFO"
     database_url: str = "sqlite:///./backend/data/careguide.db"
@@ -29,10 +30,16 @@ class Settings(BaseSettings):
     ocr_dpi: int = Field(default=200, ge=72, le=400)
     ocr_language: str = "eng"
     tesseract_cmd: Path | None = None
+    # Optional model-assisted extraction. Ollama remains local; Gemini sends only
+    # the bounded extracted text evidence to Google's API when explicitly selected.
+    ai_provider: Literal["none", "ollama", "gemini"] = "none"
     ollama_enabled: bool = False
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = ""
     ollama_timeout_seconds: int = Field(default=20, gt=0, le=120)
+    gemini_api_key: SecretStr | None = None
+    gemini_model: str = "gemini-2.5-flash-lite"
+    gemini_timeout_seconds: int = Field(default=30, gt=0, le=120)
     invoice_rounding_tolerance: Decimal = Field(default=Decimal("0.02"), ge=0)
     allow_negative_invoice_amounts: bool = False
     worker_poll_interval_seconds: float = Field(default=2.0, gt=0, le=60)

@@ -24,6 +24,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     const message = detail?.message ?? `The API returned HTTP ${response.status}.`
     throw new ApiError(message, response.status, detail?.code)
   }
+  if (response.status === 204) return undefined as T
   return response.json() as Promise<T>
 }
 
@@ -48,7 +49,7 @@ export type ValidationFinding = { id?: number; code: string; field?: string; fie
 export type HistoryEvent = { id: number; event_type: string; status?: string | null; details?: string | null; event_data?: Record<string, unknown> | null; created_at: string }
 export type CorrectionEvent = { id: number; document_id: number; field_name: string; previous_value: unknown; corrected_value: unknown; corrected_by?: string | null; correction_source?: string; reason?: string | null; created_at: string }
 export type AISuggestion = { field: string; current_value: unknown; suggested_value: unknown; evidence: string[] }
-export type AISuggestionResponse = { document_id: number; status: 'suggestions_ready' | 'no_changes'; model: string; suggestions: AISuggestion[] }
+export type AISuggestionResponse = { document_id: number; status: 'suggestions_ready' | 'no_changes'; provider: string; model: string; suggestions: AISuggestion[] }
 
 export function formatMoney(value: string | null | undefined, currency?: string | null): string {
   if (value == null || value === '') return 'Not found'

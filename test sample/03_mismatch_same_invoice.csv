@@ -1,0 +1,13 @@
+Invoice Number,CG-DEMO-1001
+Invoice Date,2026-05-10
+Supplier,North Clinic
+Customer,Care Guide
+Currency,USD
+Subtotal,100.00
+Tax,10.00
+Total,111.00
+Export note,Different source export
+
+Description,Quantity,Unit Price,Line Total
+Care visit,2,50.00,100.00
+Diagnostic kit,1,0.00,0.00

@@ -9,6 +9,7 @@ from app.config import get_settings
 from app.database import get_db
 from app.schemas.common import HealthResponse, ReadinessResponse
 from app.models.worker import WorkerHeartbeat
+from app.services.invoice_extraction import active_ai_provider
 
 router = APIRouter(tags=["health"])
 
@@ -31,7 +32,10 @@ def readiness(db: Session = Depends(get_db)) -> ReadinessResponse:
     worker_status = "ok" if active_worker else "not_running"
     tesseract_path = settings.tesseract_cmd
     ocr_status = "available" if ((tesseract_path and tesseract_path.is_file()) or shutil.which("tesseract")) else "optional_not_installed"
-    ollama_status = "enabled" if settings.ollama_enabled and settings.ollama_model else "disabled"
+    ollama_status = "enabled" if active_ai_provider(settings) == "ollama" else "disabled"
+    gemini_status = "enabled" if active_ai_provider(settings) == "gemini" else "disabled"
+    assistant_status = "enabled" if active_ai_provider(settings) else "disabled"
     return ReadinessResponse(status="ready" if active_worker else "degraded",
                              checks={"database": "ok", "worker": worker_status,
-                                     "ocr": ocr_status, "local_ai": ollama_status})
+                                     "ocr": ocr_status, "local_ai": ollama_status,
+                                     "gemini_ai": gemini_status, "ai_assistant": assistant_status})

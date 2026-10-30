@@ -9,7 +9,7 @@ from PIL import Image, ImageDraw, ImageFont
 from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
 
-from app.config import Settings
+from app.config import Settings, get_settings
 from app.database import Base, build_engine
 from app.models.document import Document
 from app.models.enums import DocumentStatus, JobStatus
@@ -26,6 +26,10 @@ from app.services.processors.image_processor import ImageProcessor
 
 @pytest.fixture
 def settings(tmp_path):
+    # Keep the test database and storage isolated, but honor the explicitly
+    # configured local Tesseract executable so OCR integration tests run when
+    # the developer has installed it in .env.
+    configured_tesseract = get_settings().tesseract_cmd
     return Settings(
         _env_file=None,
         upload_dir=tmp_path / "uploads",
@@ -35,6 +39,7 @@ def settings(tmp_path):
         min_pdf_text_chars=24,
         processing_timeout_seconds=30,
         ocr_timeout_seconds=10,
+        tesseract_cmd=configured_tesseract,
     )
 
 

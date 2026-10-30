@@ -101,6 +101,17 @@ def test_upload_queues_persisted_documents_worker_results_search_and_comparison(
     assert corrections.status_code == 200 and len(corrections.json()) == 2
     assert corrections.json()[0]["reason"] == "Verified against source"
 
+    source = client.get(f"/api/documents/{ids[0]}/source")
+    assert source.status_code == 200 and source.content == make_csv()
+    assert "invoice.csv" in source.headers["content-disposition"]
+    reviewed_pdf = client.get(f"/api/documents/{ids[0]}/invoice.pdf")
+    assert reviewed_pdf.status_code == 200 and reviewed_pdf.headers["content-type"] == "application/pdf"
+    fitz = pytest.importorskip("fitz", reason="PyMuPDF is required to inspect the generated invoice PDF")
+    pdf = fitz.open(stream=reviewed_pdf.content, filetype="pdf")
+    pdf_text = "\n".join(page.get_text() for page in pdf)
+    pdf.close()
+    assert "Reviewed invoice" in pdf_text and "CG-801" in pdf_text and "220.00" in pdf_text
+
 
 def test_local_model_suggestions_are_reviewed_saved_filtered_and_downloadable(api_context, monkeypatch):
     client, settings, factory = api_context
@@ -148,7 +159,7 @@ def test_local_ai_suggestions_return_clear_disabled_response(api_context):
     client, _settings, _factory = api_context
     response = client.post("/api/documents/99999/invoice/ai-suggestions")
     assert response.status_code == 503
-    assert response.json()["detail"]["code"] == "local_ai_disabled"
+    assert response.json()["detail"]["code"] == "ai_disabled"
 
 
 def test_upload_rejects_unsupported_formats_and_invalid_ids(api_context):
@@ -158,6 +169,80 @@ def test_upload_rejects_unsupported_formats_and_invalid_ids(api_context):
     assert (response.json().get("error") or response.json().get("detail"))["code"] == "no_files_accepted"
     assert client.get("/api/documents/99999").status_code == 404
     assert client.post("/api/documents/99999/retry").status_code == 404
+
+
+def test_delete_queued_document_removes_original_and_cascades_records(api_context):
+    client, settings, factory = api_context
+    uploaded_bytes = make_csv(marker="remove me")
+    uploaded = client.post("/api/documents/upload", files=[("files", ("remove.csv", uploaded_bytes, "text/csv"))])
+    document_id = uploaded.json()["items"][0]["document_id"]
+    with factory() as db:
+        document = db.get(Document, document_id)
+        source_path = settings.upload_dir / document.stored_filename
+        assert source_path.is_file()
+    removed = client.delete(f"/api/documents/{document_id}")
+    assert removed.status_code == 204
+    assert not source_path.exists()
+    assert client.get(f"/api/documents/{document_id}").status_code == 404
+    assert client.get("/api/documents").json()["total"] == 0
+    worker = DocumentWorker(settings, factory, DocumentIngestionService(settings), worker_id="after-delete-worker")
+    assert worker.run_once() is False
+
+
+def test_original_pdf_and_reviewed_pdf_downloads_then_remove_all_files(api_context):
+    fitz = pytest.importorskip("fitz", reason="PyMuPDF is required for PDF download verification")
+    client, settings, factory = api_context
+    pdf_doc = fitz.open()
+    page = pdf_doc.new_page()
+    page.insert_text((50, 60), "Invoice Number: CG-DOWNLOAD-1\nInvoice Date: 2026-05-10\nSupplier: North Clinic\nCustomer: Care Guide\nCurrency: USD\nSubtotal: 100.00\nTax: 10.00\nTotal: 110.00\nDescription | Quantity | Unit Price | Line Total\nVisit | 2 | 50.00 | 100.00")
+    original_bytes = pdf_doc.tobytes()
+    pdf_doc.close()
+    uploaded = client.post("/api/documents/upload", files=[
+        ("files", ("download-test.pdf", original_bytes, "application/pdf"))])
+    document_id = uploaded.json()["items"][0]["document_id"]
+    worker = DocumentWorker(settings, factory, DocumentIngestionService(settings), worker_id="download-test-worker")
+    assert worker.run_once()
+
+    source = client.get(f"/api/documents/{document_id}/source")
+    assert source.status_code == 200
+    assert source.headers["content-type"] == "application/pdf"
+    assert source.content == original_bytes
+    assert "download-test.pdf" in source.headers["content-disposition"]
+
+    reviewed = client.get(f"/api/documents/{document_id}/invoice.pdf")
+    assert reviewed.status_code == 200 and reviewed.headers["content-type"] == "application/pdf"
+    assert "reviewed-invoice.pdf" in reviewed.headers["content-disposition"]
+    reviewed_doc = fitz.open(stream=reviewed.content, filetype="pdf")
+    reviewed_text = "\n".join(item.get_text() for item in reviewed_doc)
+    reviewed_doc.close()
+    assert "CG-DOWNLOAD-1" in reviewed_text and "110.00" in reviewed_text
+
+    with factory() as db:
+        document = db.get(Document, document_id)
+        source_path = settings.upload_dir / document.stored_filename
+        result_path = settings.processed_dir / f"{Path(document.stored_filename).stem}.json"
+        text_path = settings.processed_dir / f"{Path(document.stored_filename).stem}.txt"
+        assert source_path.is_file() and result_path.is_file() and text_path.is_file()
+    removed = client.delete(f"/api/documents/{document_id}")
+    assert removed.status_code == 204
+    assert not source_path.exists() and not result_path.exists() and not text_path.exists()
+    assert client.get(f"/api/documents/{document_id}").status_code == 404
+
+
+def test_delete_refuses_document_while_worker_is_processing(api_context):
+    client, _settings, factory = api_context
+    uploaded = client.post("/api/documents/upload", files=[("files", ("active.csv", make_csv(), "text/csv"))])
+    document_id = uploaded.json()["items"][0]["document_id"]
+    with factory() as db:
+        document = db.get(Document, document_id)
+        document.status = "processing"
+        job = document.jobs[0]
+        job.status = JobStatus.RUNNING
+        db.commit()
+    refused = client.delete(f"/api/documents/{document_id}")
+    assert refused.status_code == 409
+    assert refused.json()["detail"]["code"] == "document_processing"
+    assert client.get(f"/api/documents/{document_id}").status_code == 200
 
 
 def test_failed_job_can_be_retried_and_worker_completes_it(api_context):
