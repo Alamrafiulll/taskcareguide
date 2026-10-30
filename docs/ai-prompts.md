@@ -1,112 +1,68 @@
-# AI Prompts and Development Disclosure
+# AI-Assisted Development Disclosure and Runtime Prompts
 
-This document explains two separate uses of prompts:
+This document discloses how AI-assisted development was used and records the prompts used by the application at runtime. These are separate activities: a coding assistant helped build the repository, while the running app can optionally call an invoice-extraction model.
 
-1. **Development prompts** describe the instructions used with an AI coding assistant to build and revise this repository.
-2. **Runtime prompts** are sent by the running backend to the optional Ollama or Gemini model when a reviewer requests AI-assisted extraction or correction suggestions.
+## AI-Assisted Development Disclosure
 
-AI-assisted development is not the same as runtime AI. The application’s deterministic extraction and validation do not require a model, an API key, or an Internet connection.
+### Tools Used
 
-## AI-assisted development disclosure
+OpenAI Codex and ChatGPT were used to assist with development of this AI-powered document intelligence system.
 
-This repository was developed with AI coding assistance (OpenAI Codex) under the project owner's requirements and review. The owner supplied the assessment brief and follow-up implementation requests. The coding assistant inspected the existing repository, made changes in its modules, and ran the listed automated checks. Runtime invoice processing does not use the coding assistant.
+### Scope of AI Assistance
 
-The prompt descriptions below are **detailed summaries reconstructed from the assessment requests and implementation stages**, not a verbatim transcript of every message exchanged during development.
+AI assistance supported implementation planning, code generation, debugging guidance, test-case development, documentation, and review of the application architecture.
 
-### Development prompt 1: application foundation
+The implementation was organized into five main stages:
 
-Representative prompt:
+1. Project foundation and local application setup.
+2. Document ingestion, PDF/image OCR, and spreadsheet/CSV processing.
+3. Invoice extraction, financial validation, duplicate detection, and comparison.
+4. Persistent REST API, SQLite-backed background worker, and search.
+5. Frontend integration, automated tests, and synthetic evaluation.
 
-```text
-Act as a senior full-stack engineer. Inspect the existing repository and preserve
-useful working code. Implement a Windows-friendly, local-first document
-intelligence application using FastAPI, React with Vite, SQLite with SQLAlchemy,
-Pydantic schemas, and pytest. Configure settings through environment variables,
-safe database sessions, UTC timestamps, exact Decimal money values, CORS, health
-and readiness checks, structured errors/logging, and a basic frontend health
-check. Keep optional AI out of the required startup path. Add documentation and
-tests, run the checks, fix reproducible failures, and report only work that was
-actually verified. Do not commit secrets, databases, uploads, or environments.
-```
+### Verification and Responsibility
 
-The specific repository instructions also required separate modules, PowerShell setup commands, and keeping originals separate from processed text and JSON.
+AI-generated code and suggestions were reviewed and tested to the extent documented in the repository. Actual implementation status, test outcomes, performance measurements, and known limitations are reported in the source, tests, and [evaluation report](evaluation.md).
 
-### Development prompt 2: ingestion and text extraction
+The repository represents the implementation and verification completed for this assessment. Features that have not been implemented or tested are identified as limitations rather than presented as complete.
 
-Representative prompt:
+### Prompt Records
 
-```text
-Continue the existing project without replacing working parsers. Implement a
-reusable ingestion pipeline for digital and scanned PDFs, JPG/JPEG, PNG, TIFF,
-XLSX, XLS, and CSV using free local libraries. Extract PDFs incrementally by
-page, OCR pages with little text, process every spreadsheet worksheet, preserve
-page/sheet/row context, and normalize outputs. Validate extensions, signatures,
-size and page limits; generate safe names; hash content; isolate per-file
-failures; close temporary resources; and keep OCR independent of LLMs and the
-Internet. Add fixtures and tests for valid, scanned, malformed, empty, and
-unsupported files, and document required Windows tools.
-```
+The records below cover the principal development prompts and relevant follow-up changes or debugging requests. They are concise summaries, not a verbatim transcript of every conversation. Routine questions about how to run or use the app are not included as development prompts.
 
-This stage led to processor interfaces, the normalized document output, OCR integration, spreadsheet parsing, resource limits, and local fixtures.
+#### 1. Project foundation
 
-### Development prompt 3: invoice extraction and financial review
+> Inspect the existing repository and preserve useful code. Build a local-first application with FastAPI, React/Vite, SQLite/SQLAlchemy, Pydantic, and pytest. Configure settings, safe transactions, UTC timestamps, exact-decimal money values, CORS, health/readiness endpoints, structured errors/logging, a basic frontend health check, Windows PowerShell setup, and documentation. Keep optional AI out of the required startup path. Run the relevant tests and frontend build, fix reproducible failures, and do not commit secrets, local databases, uploads, or environments.
 
-Representative prompt:
+#### 2. Document ingestion and extraction
 
-```text
-Build invoice extraction on top of the existing parsed text and tables. Extract
-invoice number/date, supplier/customer, subtotal, tax, total, currency, and line
-items. Use deterministic patterns and table parsing first; allow optional local
-Ollama assistance. Validate model output with Pydantic, use bounded retries,
-reject values unsupported by source evidence, and leave missing values null.
-Record evidence, source locations, method, field quality and review warnings.
-Implement explainable financial checks with Decimal arithmetic, configurable
-rounding tolerance, normalized supplier-plus-invoice-number duplicate checks,
-and comparisons between explicitly selected stored invoices. Preserve prior
-values and correction history.
-```
+> Integrate reusable processors for digital and scanned PDFs, JPG/JPEG, PNG, TIFF, XLSX, XLS, and CSV. Use PyMuPDF, local Tesseract OCR, Pillow, pandas/openpyxl, and xlrd. Process PDFs incrementally, OCR pages with little selectable text, preserve page/sheet/row context, enforce size and page limits, generate safe storage names, hash content, isolate per-file failures, and persist normalized results. Add synthetic fixtures for valid, empty, corrupt, malformed, and unsupported documents.
 
-### Development prompt 4: persistent API and worker
+#### 3. Invoice extraction and financial review
 
-Representative prompt:
+> Extract invoice number/date, supplier/customer, subtotal, tax, total, currency, and line items from parsed text and tables. Prefer deterministic patterns; optionally use local Ollama. Validate model output with Pydantic, retry a bounded number of times, reject unsupported values, preserve missing/uncertain values as null, and retain evidence and provenance. Implement explainable financial rules with Decimal arithmetic, configurable tolerance, supplier-plus-invoice-number duplicate checks, review flags, correction history, and comparison of explicitly selected stored documents.
 
-```text
-Connect the existing processors and invoice services to real FastAPI endpoints
-and the existing SQLAlchemy models. Accept multiple uploads, persist document
-and job records, return immediately, and process queued jobs in a restart-safe
-SQLite-backed worker. Add status/results/history, manual corrections, retry,
-search, comparison, and safe downloads. Prevent duplicate concurrent claims,
-validate inputs, return structured safe errors, and test endpoint behavior with
-temporary databases. Do not return hardcoded or fake search/results data.
-```
+#### 4. Persistent API, worker, and search
 
-### Development prompt 5: simple review UI and finalization
+> Connect the existing processors and SQLAlchemy models to real REST endpoints. Accept multiple uploads and persist document/job rows before returning. Process queued documents in a restart-safe SQLite-backed worker. Add status/results/history, corrections, retries, filters/search, comparison, and safe downloads. Prevent conflicting job claims, return structured errors, test endpoints with a temporary database, and do not return hardcoded results.
 
-Representative prompt:
+#### 5. Frontend, tests, and evaluation
 
-```text
-Make the React interface understandable for an invoice reviewer. Let the user
-upload files, see processing status and validation findings, inspect extracted
-values with evidence, request optional AI proposals, explicitly choose and save
-corrections, compare selected related documents, search results, and download
-the original file or a clearly labeled reviewed summary. Make corrections
-auditable, make destructive removal explicit, use real backend data, and test
-the frontend build and workflows. Document setup, architecture, limitations,
-evaluation results, and a walkthrough without claiming unmeasured production
-scale or accuracy.
-```
+> Build a usable React interface connected to the real API for upload, processing status, invoice review, validation findings, corrections, comparison, search, retries, and downloads. Use synthetic labeled fixtures to measure field extraction, processing success/failure, validation outcomes, and timing. Report measured results and limitations; do not claim production-scale concurrency or accuracy from a small local dataset.
 
-These development prompts express the requirements and desired outcomes. They are not prompts that the application sends to an invoice model.
+#### Follow-up implementation and debugging requests
 
-## Runtime AI behavior
+Follow-up prompts refined the existing implementation rather than creating disconnected examples. They included requests to verify local Tesseract and OCR behavior on Windows; fix reproducible backend and frontend test failures; add provider selection for local Ollama and optional Gemini while retaining deterministic fallback; serve the original file separately from a generated reviewed PDF; add confirmed document removal; simplify navigation and search descriptions; and make automated tests independent of runtime AI settings in `.env`.
 
-Runtime AI is off unless configured. `AI_PROVIDER=none` uses deterministic extraction only. `AI_PROVIDER=ollama` selects the local Ollama endpoint when Ollama is enabled and a model is configured. `AI_PROVIDER=gemini` selects the Gemini Developer API when a key is configured. Only the selected provider is used.
+## Runtime AI Behavior
 
-The backend sends normalized text and table evidence, capped at 60,000 characters. It does not upload the original PDF, image, or spreadsheet bytes to the model provider. The model name, provider, retry count, extraction method, and field evidence are recorded with the result. The model does not run code and output is treated as untrusted data.
+Runtime AI is optional. With `AI_PROVIDER=none`, the app uses deterministic extraction only. `AI_PROVIDER=ollama` selects a local Ollama model; `AI_PROVIDER=gemini` selects the Gemini Developer API. The backend calls only the selected, configured provider. Core parsing and validation do not require AI.
 
-### Runtime invoice extraction prompt
+The backend sends normalized extracted text and table evidence, capped at 60,000 characters. It does not send the uploaded PDF, image, or spreadsheet bytes to the model provider. Provider/model, extraction method, retry limit, and evidence metadata are recorded with the extraction result. Model output is treated as untrusted structured data and is never executed.
 
-Both provider paths use these extraction instructions. The code adds the document's normalized evidence after the `Evidence:` marker:
+## Runtime Invoice Extraction Prompt
+
+Both provider implementations use the following instructions and append the document's normalized evidence after `Evidence:`:
 
 ```text
 Extract invoice values only when directly supported by the supplied evidence.
@@ -120,25 +76,20 @@ Evidence:
 <normalized page and worksheet text from this document>
 ```
 
-### Runtime safeguards
+The model response is validated against the `InvoiceExtraction` Pydantic schema. Unknown keys, malformed JSON, invalid currency codes, or unsupported values are rejected. Each provider has at most two attempts. Deterministic extraction runs first, and deterministic non-null values take precedence over model output. If AI is unavailable or invalid, deterministic extraction remains usable.
 
-- **Evidence first:** deterministic extraction always runs. Deterministic non-null values take precedence over model suggestions.
-- **Schema validation:** the complete response is parsed as the `InvoiceExtraction` Pydantic schema. Unknown keys, invalid currency codes, invalid types, and malformed JSON are rejected.
-- **Bounded retries:** each provider is tried at most twice. Invalid, ungrounded, unavailable, or timed-out output is discarded; deterministic results remain available.
-- **Grounding:** non-null scalar values must appear in the normalized evidence. Line-item values must be grounded too. Unsupported values do not overwrite extracted values.
-- **Uncertainty:** the model's self-reported confidence is not trusted. Missing values stay null, and the app uses separate heuristic source-quality indicators that are explicitly not calibrated probabilities.
-- **Human approval:** the suggestions endpoint returns proposals only for fields already flagged for review. It does not save or apply them. A reviewer must select suggestions and explicitly save the correction; the old value and correction history are retained.
+## Runtime Correction Suggestions
 
-### Ollama versus Gemini
+The suggestion endpoint uses the same evidence-first extraction prompt. The backend returns only changed, non-null suggestions for fields already flagged for review, with supporting snippets. Suggestions are not automatically saved or applied. A reviewer must select and save them; the correction audit stores prior and corrected values, reviewer/reason, and model provenance.
 
-**Ollama** runs on the local machine at `http://localhost:11434`. The code requests JSON mode and temperature zero. No API key is used, and after the model is downloaded inference can run offline.
+## Runtime Safeguards and Provider Notes
 
-**Gemini** makes an HTTPS request to Google's API. Its API key comes from the backend-only `GEMINI_API_KEY` environment variable and is sent in a request header, never in the URL or frontend. This provider is optional and changes the original assessment's local-only/no-key constraint. Google documents model-specific free quotas; its terms say content submitted under unpaid usage may be used to improve services and may be reviewed. Use only synthetic, non-sensitive assessment documents with unpaid Gemini quota. See Google's [pricing](https://ai.google.dev/gemini-api/docs/pricing), [terms](https://ai.google.dev/gemini-api/terms), and [API key guidance](https://ai.google.dev/gemini-api/docs/api-key).
+- **Grounding:** non-null values must be supported by normalized source evidence. This reduces unsupported output but cannot prove that OCR or the source document is correct.
+- **Uncertainty:** missing values remain null. The model's self-reported confidence is not used as a probability; field-quality indicators are heuristic and documented as uncalibrated.
+- **Human review:** missing, conflicting, OCR-derived, or low-quality values are flagged. Accepted suggestions are recorded as corrections, not silent replacements.
+- **Ollama:** runs locally at the configured loopback address. Once Ollama and its model are installed, inference can run offline without an API key.
+- **Gemini:** sends extracted evidence to Google's HTTPS API. Its key is read from backend environment configuration and sent in a request header. The key must never be placed in frontend code or committed files. Gemini is an optional cloud provider and changes the original local-only/no-key constraint. Google's unpaid-tier terms allow submitted content to be used to improve services and reviewed; use synthetic, non-sensitive documents only. See Google's [pricing](https://ai.google.dev/gemini-api/docs/pricing), [terms](https://ai.google.dev/gemini-api/terms), and [API key guidance](https://ai.google.dev/gemini-api/docs/api-key).
 
-## Runtime correction suggestions
+## Prompt Maintenance
 
-The AI suggestions endpoint uses the same evidence-first invoice extraction prompt. After receiving a validated candidate, the backend compares it with stored values and the fields already marked for review. It returns only changed, non-null proposals with supporting snippets. It does not modify the database. The normal correction endpoint records accepted values, reviewer/reason, model provenance, and before/after history.
-
-## Prompt maintenance and limitations
-
-Keep the prompt explicit about nulls, source evidence, JSON shape, and no inference. Update `InvoiceExtraction`, output validation, tests, and this document together when changing the response contract. A small local model can misunderstand or omit invoice fields; grounding checks reduce unsupported values but do not prove a value is correct. OCR mistakes can also affect any model's evidence. Review all flagged results against the original document.
+Keep prompts explicit about the evidence boundary, null handling, and JSON shape. When changing the response contract, update the Pydantic schema, extraction validation, tests, and this document together. Review extracted results against the original document, especially when OCR is involved.
